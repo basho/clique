@@ -1,0 +1,14 @@
+{application, riak_cli,
+ [
+  {description, "A CLI handling library for erlang"},
+  {vsn, "0.0.1"},
+  {modules, [
+             riak_cli
+            ]},
+  {registered, []},
+  {applications, [
+                  kernel,
+                  stdlib
+                 ]},
+  {env, []}
+ ]}.
