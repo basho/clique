@@ -1,18 +1,28 @@
 -module(riak_cli).
 
-%% riak_cli: riak_cli library's entry point.
-
--export([my_func/0]).
-
-
 %% API
+%% Just re-exported functions from riak_cli_manager, mewstly.
+-export([register_command/5,
+         register_config/2,
+         run/1,
+         print/1]).
 
-my_func() ->
-    ok().
+%% @doc Register configuration callbacks for a given config key
+-spec register_config([string()], fun()) -> true.
+register_config(Key, Callback) ->
+    riak_cli_manager:register_config(Key, Callback).
 
-%% Internals
+%% @doc Register a cli command (i.e.: "riak-admin handoff status")
+-spec register_command([string()], string(), list(), list(), fun()) -> true.
+register_command(Cmd, Description, Keys, Flags, Fun) ->
+    riak_cli_manager:register_command(Cmd, Description, Keys, Flags, Fun).
 
-ok() ->
-    ok.
+%% @doc Take a status type and generate console output
+-spec print(riak_cli_status:status()) -> ok.
+print(Status) ->
+    riak_cli_manager:write_status(Status).
 
-%% End of Module.
+%% @doc Run a config operation or command
+-spec run([string()]) -> ok | {error, term()}.
+run(Strings) ->
+    riak_cli_manager:run(Strings).
