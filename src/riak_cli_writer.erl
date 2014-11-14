@@ -38,8 +38,9 @@ write_status(done, Ctx) ->
 -spec write_table([{iolist(), iolist()}]) -> iolist().
 write_table([]) ->
     "";
-write_table(Rows) ->
-    Schema = [Name || {Name, _Val} <- hd(Rows)],
+write_table(Rows0) ->
+    Schema = [Name || {Name, _Val} <- hd(Rows0)],
+    Rows = [[Val || {_Name, Val} <- Row] || Row <- Rows0],
     Table = riak_cli_table:autosize_create_table(Schema, Rows),
     io_lib:format("~ts~n", [Table]).
 

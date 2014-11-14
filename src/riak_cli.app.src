@@ -2,13 +2,12 @@
  [
   {description, "A CLI handling library for erlang"},
   {vsn, "0.0.1"},
-  {modules, [
-             riak_cli
-            ]},
+  {modules, []},
   {registered, []},
   {applications, [
                   kernel,
                   stdlib
                  ]},
+  {mod, {riak_cli_app, []}},
   {env, []}
  ]}.

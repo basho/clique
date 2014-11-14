@@ -10,6 +10,8 @@
 
 -include("riak_cli_status_types.hrl").
 
+-export_type([status/0]).
+
 -spec parse(status(), fun(), Acc0 :: term()) -> term().
 parse([], Fun, Acc) ->
     Fun(done, Acc);

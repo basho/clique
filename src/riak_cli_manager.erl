@@ -45,7 +45,7 @@ register_command(Cmd, Description, Keys, Flags, Fun) ->
     ets:insert(?cmd_table, {Cmd, Description, Keys, Flags, Fun}).
 
 write_status(Status) ->
-    Output = riak_:write(Status),
+    Output = riak_cli_writer:write(Status),
     io:format("~s", [Output]),
     ok.
 
