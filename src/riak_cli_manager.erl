@@ -15,12 +15,14 @@
 %% API
 -export([register_command/5,
          register_config/2,
+         register_usage/2,
          run/1,
          write_status/1]).
 
 -define(cmd_table, riak_cli_commands).
 -define(config_table, riak_cli_config).
 -define(schema_table, riak_cli_schema).
+-define(usage_table, riak_cli_usage).
 
 -record(state, {}).
 
@@ -44,6 +46,14 @@ register_config(Key, Callback) ->
 register_command(Cmd, Description, Keys, Flags, Fun) ->
     ets:insert(?cmd_table, {Cmd, Description, Keys, Flags, Fun}).
 
+%% @doc Register usage for a given command sequence. Lookups are by longest
+%% match.
+-spec register_usage([string()], iolist()) -> true.
+register_usage(Cmd, Usage0) ->
+    Usage = ["Usage: ", Usage0],
+    ets:insert(?usage_table, {Cmd, Usage}).
+
+%% @
 write_status(Status) ->
     Output = riak_cli_writer:write(Status),
     io:format("~s", [Output]),
@@ -54,11 +64,49 @@ run([_Script, "set" | Args]) ->
     run_set(Args);
 run([_Script, "show" | Args]) ->
     run_show(Args);
-run(Cmd) ->
-    M0 = match(Cmd, ?cmd_table),
-    M1 = parse(M0),
-    M2 = validate(M1),
-    run_command(M2).
+run(Cmd0) ->
+    case is_help(Cmd0) of
+        {ok, Cmd} ->
+            print_usage(Cmd);
+        _ ->
+            M0 = match(Cmd0, ?cmd_table),
+            M1 = parse(M0),
+            M2 = validate(M1),
+            run_command(M2)
+    end.
+
+%% @doc Help flags always comes at the end of the command
+-spec is_help(iolist()) -> {ok, iolist()} | false.
+is_help(Str) ->
+    [H | T] = lists:reverse(Str),
+    case H =:= "--help" orelse H =:= "-h" of
+        true ->
+            {ok, lists:reverse(T)};
+        false ->
+            false
+    end.
+
+-spec print_usage(iolist()) -> ok.
+print_usage(Cmd) ->
+    Usage = case find_usage(Cmd) of
+                {error, Error} ->
+                    Error;
+                Usage2 ->
+                    Usage2
+            end,
+    io:format("~s", [Usage]).
+
+-spec find_usage(iolist()) -> iolist().
+find_usage([]) ->
+    {error, "Error: Usage information not found for the given command\n\n"};
+find_usage(Cmd) ->
+    case ets:lookup(?usage_table, Cmd) of
+        [{Cmd, Usage}] ->
+            Usage;
+        [] ->
+            Cmd2 = lists:reverse(tl(lists:reverse(Cmd))),
+            find_usage(Cmd2)
+    end.
 
 -spec run_command(err()) -> err();
                  ({fun(), [kvpair()], [kvpair()]})-> ok | err().
@@ -234,6 +282,7 @@ init([]) ->
     _ = ets:new(?cmd_table, [public, named_table]),
     _ = ets:new(?config_table, [public, named_table]),
     _ = ets:new(?schema_table, [public, named_table]),
+    _ = ets:new(?usage_table, [public, named_table]),
     SchemaFiles = filelib:wildcard(code:lib_dir() ++ "/*.schema"),
     Schema = cuttlefish_schema:files(SchemaFiles),
     true = ets:insert(?schema_table, {schema, Schema}),
@@ -251,8 +300,13 @@ code_change(_OldVsn, State, _Extra) ->
     {ok, State}.
 
 -spec print_error(err()) -> ok.
-print_error({error, no_matching_spec}) ->
-    io:format("Invalid Command~n");
+print_error({error, {no_matching_spec, Cmd}}) ->
+    case find_usage(Cmd) of
+        {error, _} ->
+            io:format("Invalid Command~n");
+        Usage ->
+            io:format("~s", [Usage])
+    end;
 print_error({error, {invalid_flag, Str}}) ->
     io:format("Invalid Flag: ~p~n", [Str]);
 print_error({error, {invalid_action, Str}}) ->
@@ -281,7 +335,7 @@ match(Cmd0, Table) ->
         [Spec] ->
             {Spec, Args};
         [] ->
-            {error, no_matching_spec}
+            {error, {no_matching_spec, Cmd0}}
     end.
 
 -spec split_command([list()]) -> {list(), list()}.
