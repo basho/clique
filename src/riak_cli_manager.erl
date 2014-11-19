@@ -13,19 +13,27 @@
         ]).
 
 %% API
--export([register_command/5,
+-export([register_command/4,
          register_config/2,
          register_usage/2,
+         register_node_finder/1,
          run/1,
          write_status/1]).
+
+%% Callbacks for rpc calls
+-export([get_local_env_status/2,
+         get_local_env_vals/1,
+         set_local_app_config/1]).
 
 -define(cmd_table, riak_cli_commands).
 -define(config_table, riak_cli_config).
 -define(schema_table, riak_cli_schema).
 -define(usage_table, riak_cli_usage).
+-define(nodes_table, riak_cli_nodes).
 
 -record(state, {}).
 
+-type status() :: riak_cli_status:status().
 -type err() :: {error, term()}.
 -type kvpair() :: {term(), term()}.
 -type str_kvpairs() :: [{string(), string()}].
@@ -36,15 +44,19 @@
 -type keyspecs() :: [spec()].
 -type flagspecs() ::[spec()].
 
+-spec register_node_finder(fun()) -> true.
+register_node_finder(Fun) ->
+    ets:insert(?nodes_table, {nodes_fun, Fun}).
+
 %% @doc Register configuration callbacks for a given config key
 -spec register_config([string()], fun()) -> true.
 register_config(Key, Callback) ->
     ets:insert(?config_table, {Key, Callback}).
 
 %% @doc Register a cli command (i.e.: "riak-admin handoff status")
--spec register_command([string()], string(), list(), list(), fun()) -> true.
-register_command(Cmd, Description, Keys, Flags, Fun) ->
-    ets:insert(?cmd_table, {Cmd, Description, Keys, Flags, Fun}).
+-spec register_command([string()], list(), list(), fun()) -> true.
+register_command(Cmd, Keys, Flags, Fun) ->
+    ets:insert(?cmd_table, {Cmd, Keys, Flags, Fun}).
 
 %% @doc Register usage for a given command sequence. Lookups are by longest
 %% match.
@@ -53,7 +65,6 @@ register_usage(Cmd, Usage0) ->
     Usage = ["Usage: ", Usage0],
     ets:insert(?usage_table, {Cmd, Usage}).
 
-%% @
 write_status(Status) ->
     Output = riak_cli_writer:write(Status),
     io:format("~s", [Output]),
@@ -129,12 +140,97 @@ run_set(ArgsAndFlags) ->
     end.
 
 %% TODO: This doesn't work for keys with translations.
-%% This should almost certainly show the riak_conf value. For now it only works
+%% This should almost certainly show the riak.conf value. For now it only works
 %% for 1:1 mappings because of we don't save the user value AFAIK.
-%% TODO: clean this function up
 -spec run_show([string()]) -> ok | err().
 run_show(KeysAndFlags) ->
-    {Keys0, _Flags0} = lists:splitwith(fun is_not_flag/1, KeysAndFlags),
+    case get_valid_mappings(KeysAndFlags) of
+        {error, _}=E ->
+            print_error(E);
+        {Keys, Mappings, Flags0}->
+            AppKeyPairs = get_env_keys(Mappings),
+            case validate_flags(config_flags(), Flags0) of
+                {error, _}=E ->
+                    print_error(E);
+                Flags ->
+                    Status = get_env_status(Keys, AppKeyPairs, Flags),
+                    write_status(Status)
+            end
+    end.
+
+-spec get_env_status([string()], [{atom(), atom()}], [kvpair()]) -> status().
+get_env_status(Keys, AppKeyPairs, []) ->
+    get_local_env_status(Keys, AppKeyPairs);
+get_env_status(Keys, AppKeyPairs, Flags) when length(Flags) =:= 1 ->
+    [{Key, Val}] = Flags,
+    case Key of
+        node -> get_remote_env_status(Keys, AppKeyPairs, Val);
+        all -> get_remote_env_status(Keys, AppKeyPairs)
+    end;
+get_env_status(_Keys, _AppKeyPairs, _Flags) ->
+    app_config_flags_error().
+
+get_local_env_status(Keys, AppKeyPairs) ->
+    Row = get_local_env_vals(AppKeyPairs),
+    [riak_cli_status:table([lists:zip(["Node" | Keys], Row)])].
+
+get_local_env_vals(AppKeyPairs) ->
+    Vals = [begin
+                {ok, Val} = application:get_env(App, Key),
+                Val
+            end || {App, Key} <- AppKeyPairs],
+    [node() | Vals].
+
+-spec get_remote_env_status([string()], [{atom(), atom()}], node()) -> status().
+get_remote_env_status(Keys, AppKeyPairs, Node) ->
+    case safe_rpc(Node, ?MODULE, get_local_env_status, [Keys, AppKeyPairs]) of
+        {badrpc, rpc_process_down} ->
+            io:format("Error: Node ~p Down~n", [Node]),
+            [];
+        Status ->
+            Status
+    end.
+
+-spec get_nodes() -> [node()].
+get_nodes() ->
+    [{nodes_fun, Fun}] = ets:lookup(?nodes_table, nodes_fun),
+    Fun().
+
+-spec get_remote_env_status([string()], [{atom(), atom()}]) -> status().
+get_remote_env_status(Keys0, AppKeyPairs) ->
+    Nodes = get_nodes(),
+    {Rows0, Down} = rpc:multicall(Nodes,
+                                  ?MODULE,
+                                  get_local_env_vals,
+                                  [AppKeyPairs],
+                                  60000),
+    Keys = ["Node" | Keys0],
+    Rows = [lists:zip(Keys, Row) || Row <- Rows0],
+    Table = riak_cli_status:table(Rows),
+    case (Down == []) of
+        false ->
+            Text = io_lib:format("Failed to get config for: ~p~n", [Down]),
+            Alert = riak_cli_status:alert([riak_cli_status:text(Text)]),
+            [Table, Alert];
+        true ->
+            [Table]
+    end.
+
+-spec app_config_flags_error() -> err().
+app_config_flags_error() ->
+    Msg = "Cannot use --all(-a) and --node(-n) at the same time",
+    io:format("Error: ~p~n", [Msg]),
+    {error, {invalid_flag_combination, Msg}}.
+
+-spec get_env_keys(list(tuple())) -> [{atom(), atom()}].
+get_env_keys(Mappings) ->
+    EnvStrs = [element(3, M) || M <- Mappings],
+    AppAndKeys = [string:tokens(S, ".") || S <- EnvStrs],
+    [{list_to_atom(App), list_to_atom(Key)} || [App, Key] <-  AppAndKeys].
+
+-spec get_valid_mappings(iolist()) -> err() | {iolist(), list(), flags()}.
+get_valid_mappings(KeysAndFlags) ->
+    {Keys0, Flags0} = lists:splitwith(fun is_not_flag/1, KeysAndFlags),
     Keys = [cuttlefish_variable:tokenize(K) || K <- Keys0],
     [{schema, Schema}] = ets:lookup(?schema_table, schema),
     {_Translations, Mappings0, _Validators} = Schema,
@@ -142,21 +238,14 @@ run_show(KeysAndFlags) ->
     case length(Mappings) =:= length(Keys) of
         false ->
             Invalid = invalid_keys(Keys, Mappings),
-            io:format("Invalid Config Keys: ~p", [Invalid]),
             {error, {invalid_config_keys, Invalid}};
         true ->
-            EnvStrs = [{element(2, M), element(3, M)} || M <- Mappings],
-
-            AppAndKeys = [string:tokens(S, ".") || S <- EnvStrs],
-            AppKeyPairs = [{list_to_atom(App), list_to_atom(Key)} || [App, Key] <-
-                AppAndKeys],
-            %% TODO: Extend this to handle --node and --all flags
-            Rows = [[begin
-                        {ok, Val} = application:get_env(App, Key),
-                        Val
-                     end || {App, Key} <- AppKeyPairs]],
-            Status = [{table, Keys0, Rows}],
-            write_status(Status)
+            case parse_flags(Flags0) of
+                {error, _}=E ->
+                    E;
+                Flags ->
+                    {Keys0, Mappings, Flags}
+            end
     end.
 
 
@@ -228,9 +317,7 @@ set_app_config(AppConfig, Flags) when length(Flags) =:= 1 ->
         all -> set_remote_app_config(AppConfig)
     end;
 set_app_config(_AppConfig, _Flags) ->
-    Msg = "Cannot use --all(-a) and --node(-n) at the same time",
-    io:format("Error: ~p~n", [Msg]),
-    {error, {invalid_flag_combination, Msg}}.
+    app_config_flags_error().
 
 -spec set_local_app_config(app_config()) -> ok.
 set_local_app_config(AppConfig) ->
@@ -245,14 +332,14 @@ set_remote_app_config(AppConfig, Node) ->
         {badrpc, rpc_process_down} ->
             io:format("Error: Node ~p Down~n", [Node]),
             ok;
-        _ ->
+        ok ->
             ok
     end.
 
 -spec set_remote_app_config(app_config()) -> ok.
 set_remote_app_config(AppConfig) ->
     io:format("Setting config across the cluster~n", []),
-    {_, Down} = rpc:multicall(nodes(),
+    {_, Down} = rpc:multicall(get_nodes(),
                               ?MODULE,
                               set_local_app_config,
                               [AppConfig],
@@ -283,6 +370,7 @@ init([]) ->
     _ = ets:new(?config_table, [public, named_table]),
     _ = ets:new(?schema_table, [public, named_table]),
     _ = ets:new(?usage_table, [public, named_table]),
+    _ = ets:new(?nodes_table, [public, named_table]),
     SchemaFiles = filelib:wildcard(code:lib_dir() ++ "/*.schema"),
     Schema = cuttlefish_schema:files(SchemaFiles),
     true = ets:insert(?schema_table, {schema, Schema}),
@@ -325,6 +413,8 @@ print_error({error, {invalid_kv_arg, Arg}}) ->
     io:format("Not a Key/Value argument of format: ~p=<Value>: ~n", [Arg]);
 print_error({error, {too_many_equal_signs, Arg}}) ->
     io:format("Too Many Equal Signs in Argument: ~p~n", [Arg]);
+print_error({error, {invalid_config_keys, Invalid}}) ->
+    io:format("Invalid Config Keys: ~p~n", [Invalid]);
 print_error({error, {invalid_config, Msg}}) ->
     io:format("Invalid Configuration: ~p~n", [Msg]).
 
@@ -428,7 +518,7 @@ parse_flags([Val | _T], [], _Acc) ->
 validate({error, _}=E) ->
     E;
 validate({Spec, Args0, Flags0}) ->
-    {_Cmd, _Description, KeySpecs, FlagSpecs, Callback} = Spec,
+    {_Cmd, KeySpecs, FlagSpecs, Callback} = Spec,
     case validate_args(KeySpecs, Args0) of
         {error, _}=E ->
             E;
