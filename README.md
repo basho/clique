@@ -1,6 +1,36 @@
-Riak CLI is a library for building command line interfaces in Erlang.It provides
+Riak CLI is a library for building command line interfaces in Erlang. It provides
 command and option parsing, configuration showing and setting using cuttlefish,
 and a small status type API that enables pretty printing.
+
+# CLI usage
+``riak_cli`` allows you define a command line interface using the Erlang API
+described below. The interface provides both configuration and arbitrary
+command handling. In the interest of clarity, a few examples will be given to
+illustrate it's usage.
+
+```shell
+
+# Show the configuration for 2 config variables. Multiple values can be
+# shown by using spaces between them. The --all flag means: give me the values
+# on all nodes in the cluster.
+
+$ dev/dev1/bin/riak-admin show transfer_limit leveldb.limited_developer_mem --all
++--------------+--------------+-----------------------------+
+|     Node     |transfer_limit|leveldb.limited_developer_mem|
++--------------+--------------+-----------------------------+
+|dev1@127.0.0.1|      4       |            true             |
+|dev2@127.0.0.1|      6       |            true             |
++--------------+--------------+-----------------------------+
+
+
+# Set the transfer_limit config on dev2
+$ dev/dev1/bin/riak-admin set transfer_limit=6 --node=dev2@127.0.0.1
+Set transfer limit for 'dev2@127.0.0.1' to 6
+
+# Run an aribtrary, user defined command (this one doesn't exist... yet)
+$ dev/dev1/bin/riak-admin handoff status
+
+```
 
 # Erlang API
 The public API lives in
@@ -84,7 +114,7 @@ easier, the user must explicitly register usage points. If one of these points
 is hit, the registered Usage string will be shown. Note that "Usage: " will be
 prepended to the string, so don't add that part in.
 
-```
+```erlang
 handoff_usage() ->
     ["riak-admin handoff <sub-command>\n\n",
      "  View handoff related status\n\n",
@@ -116,6 +146,8 @@ riak_cli_status.erl. It may want to format this for display on the console. In
 that case it would take the given status and call ``riak_cli:print(Status)``.
 
 ```erlang
+%% The first element of the first row's elements is used as the titles for the
+%% columns. All rows should have matching proplists forms.
 Table = [[{node, "dev1@127.0.0.1"}, {num_connections, 100}],
           {node, "dev2@127.0.0.1"}, {num_connections, 90}]],
 
@@ -133,7 +165,7 @@ the command is not configuration related and the other registered info is
 used. This should only need to be called in one place in a given application. In
 riak_core it gets called in ``riak_core_console:command/1``.
 
-```
+```erlang
 %% New CLI API
 -export([command/1]).
 
@@ -141,3 +173,15 @@ riak_core it gets called in ``riak_core_console:command/1``.
 command(Cmd) ->
     riak_cli_manager:run(Cmd).
 ```
+
+# Status API
+Riak CLI provides pretty printing support for status information. In order to do
+this it requires status to be formatted in a specific manner when returned from
+a command. All custom commands should return a type of `riak_cli_status:status()`.
+An example is above in the documentation for `print/1`.
+
+The entire status api lives [here](https://github.com/basho/riak_cli/blob/master/src/riak_cli_status.erl).
+
+The api functions should be used instead of creating the status types directly.
+The status types are output via the [riak_cli_writer](https://github.com/basho/riak_cli/blob/master/src/riak_cli_writer.erl).
+
