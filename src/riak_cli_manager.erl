@@ -35,7 +35,6 @@
 
 -type status() :: riak_cli_status:status().
 -type proplist() :: [{atom(), term()}].
--type str_proplist() :: [{string(), string()}].
 -type err() :: {error, term()}.
 -type flags() :: [{atom() | char(), term()}].
 -type app_config() :: proplist().
