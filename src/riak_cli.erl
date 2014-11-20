@@ -14,7 +14,7 @@
 %% also report an alert for nodes that are not currently available instead of just
 %% ignoring them. This allows the caller to define how we find the list of
 %% cluster member nodes.
--spec register_node_finder(fun()) -> [node()].
+-spec register_node_finder(fun()) -> true.
 register_node_finder(Fun) ->
     riak_cli_manager:register_node_finder(Fun).
 

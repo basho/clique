@@ -35,12 +35,12 @@ text(IoList) ->
 column(Title, Values) ->
     {column, Title, Values}.
 
-%% @doc A table is a zipped list of attribute/val pairs. Each zipped list
+%% @doc A table is a list of zipped lists of attribute/val pairs. Each zipped list
 %% represents a row and the first element of each pair in the first list is the
 %% title of the tables.
--spec table([{iolist(), iolist()}]) -> table().
-table(Proplist) ->
-   {table, Proplist}.
+-spec table([[{atom() | string(), term()}]]) -> table().
+table(Proplists) ->
+   {table, Proplists}.
 
 %% A list of elements
 -spec alert([column() | table() | text()]) -> alert().

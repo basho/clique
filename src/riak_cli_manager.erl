@@ -34,13 +34,12 @@
 -record(state, {}).
 
 -type status() :: riak_cli_status:status().
+-type proplist() :: [{atom(), term()}].
+-type str_proplist() :: [{string(), string()}].
 -type err() :: {error, term()}.
--type kvpair() :: {term(), term()}.
--type str_kvpairs() :: [{string(), string()}].
--type flags() :: [{atom(), term()}].
-%%-type app_config() :: [{atom(), [kvpair()]}].
--type app_config() :: [proplists:property()].
--type spec() :: {atom(), [kvpair()]}.
+-type flags() :: [{atom() | char(), term()}].
+-type app_config() :: proplist().
+-type spec() :: {atom(), proplist()}.
 -type keyspecs() :: [spec()].
 -type flagspecs() ::[spec()].
 
@@ -107,7 +106,7 @@ print_usage(Cmd) ->
             end,
     io:format("~s", [Usage]).
 
--spec find_usage(iolist()) -> iolist().
+-spec find_usage(iolist()) -> iolist() | err().
 find_usage([]) ->
     {error, "Error: Usage information not found for the given command\n\n"};
 find_usage(Cmd) ->
@@ -120,7 +119,7 @@ find_usage(Cmd) ->
     end.
 
 -spec run_command(err()) -> err();
-                 ({fun(), [kvpair()], [kvpair()]})-> ok | err().
+                 ({fun(), proplist(), proplist()})-> ok | err().
 run_command({error, _}=E) ->
     print_error(E),
     E;
@@ -158,7 +157,7 @@ run_show(KeysAndFlags) ->
             end
     end.
 
--spec get_env_status([string()], [{atom(), atom()}], [kvpair()]) -> status().
+-spec get_env_status([string()], [{atom(), atom()}], flags()) -> status().
 get_env_status(Keys, AppKeyPairs, []) ->
     get_local_env_status(Keys, AppKeyPairs);
 get_env_status(Keys, AppKeyPairs, Flags) when length(Flags) =:= 1 ->
@@ -168,12 +167,15 @@ get_env_status(Keys, AppKeyPairs, Flags) when length(Flags) =:= 1 ->
         all -> get_remote_env_status(Keys, AppKeyPairs)
     end;
 get_env_status(_Keys, _AppKeyPairs, _Flags) ->
-    app_config_flags_error().
+    _ = app_config_flags_error(),
+    [].
 
+-spec get_local_env_status([string()], [{atom(), atom()}]) -> status().
 get_local_env_status(Keys, AppKeyPairs) ->
     Row = get_local_env_vals(AppKeyPairs),
     [riak_cli_status:table([lists:zip(["Node" | Keys], Row)])].
 
+-spec get_local_env_vals([{atom(), atom()}]) -> list().
 get_local_env_vals(AppKeyPairs) ->
     Vals = [begin
                 {ok, Val} = application:get_env(App, Key),
@@ -219,7 +221,6 @@ get_remote_env_status(Keys0, AppKeyPairs) ->
 -spec app_config_flags_error() -> err().
 app_config_flags_error() ->
     Msg = "Cannot use --all(-a) and --node(-n) at the same time",
-    io:format("Error: ~p~n", [Msg]),
     {error, {invalid_flag_combination, Msg}}.
 
 -spec get_env_keys(list(tuple())) -> [{atom(), atom()}].
@@ -228,7 +229,7 @@ get_env_keys(Mappings) ->
     AppAndKeys = [string:tokens(S, ".") || S <- EnvStrs],
     [{list_to_atom(App), list_to_atom(Key)} || [App, Key] <-  AppAndKeys].
 
--spec get_valid_mappings(iolist()) -> err() | {iolist(), list(), flags()}.
+-spec get_valid_mappings([string()]) -> err() | {[string()], list(tuple()), flags()}.
 get_valid_mappings(KeysAndFlags) ->
     {Keys0, Flags0} = lists:splitwith(fun is_not_flag/1, KeysAndFlags),
     Keys = [cuttlefish_variable:tokenize(K) || K <- Keys0],
@@ -249,6 +250,7 @@ get_valid_mappings(KeysAndFlags) ->
     end.
 
 
+-spec valid_mappings([string()], [tuple()]) -> [tuple()].
 valid_mappings(Keys, Mappings) ->
     lists:filter(fun(Mapping) ->
                      Key = element(2, Mapping),
@@ -276,8 +278,8 @@ run_callback({Args, Flags}) ->
     [F(K, V, Flags) || {K, V, F} <- KVFuns].
 
 -spec get_config(err()) -> err();
-                ({str_kvpairs(), str_kvpairs()}) ->
-                    {app_config(), str_kvpairs(), flags()} | err().
+                ({str_proplist(), str_proplist()}) ->
+                    {app_config(), str_proplist(), flags()} | err().
 get_config({error, _}=E) ->
     E;
 get_config({Args, Flags0}) ->
@@ -296,7 +298,7 @@ get_config({Args, Flags0}) ->
     end.
 
 -spec set_config(err()) -> err();
-      ({app_config(), str_kvpairs(), flags()}) -> {[kvpair()], flags()}| err().
+      ({app_config(), str_proplist(), flags()}) -> {proplist(), flags()}| err().
 set_config({error, _}=E) ->
     E;
 set_config({AppConfig, Args, Flags}) ->
@@ -317,7 +319,8 @@ set_app_config(AppConfig, Flags) when length(Flags) =:= 1 ->
         all -> set_remote_app_config(AppConfig)
     end;
 set_app_config(_AppConfig, _Flags) ->
-    app_config_flags_error().
+    _ = app_config_flags_error(),
+    [].
 
 -spec set_local_app_config(app_config()) -> ok.
 set_local_app_config(AppConfig) ->
@@ -407,6 +410,8 @@ print_error({error, {invalid_flags, Flags}}) ->
     io:format("Invalid Flags: ~p~n", [Flags]);
 print_error({error, {invalid_flag_value, {Name, Val}}}) ->
     io:format("Invalid value: ~p for flag: ~p~n", [Val, Name]);
+print_error({error, {invalid_flag_combination, Msg}}) ->
+    io:format("Error: ~p~n", [Msg]);
 print_error({error, {invalid_value, Val}}) ->
     io:format("Invalid value: ~p~n", [Val]);
 print_error({error, {invalid_kv_arg, Arg}}) ->
@@ -435,9 +440,9 @@ split_command(Cmd0) ->
                     end, Cmd0).
 
 -spec parse(err()) -> err();
-           ([string()]) -> {str_kvpairs(), str_kvpairs()} | err();
+           ([string()]) -> {proplist(), flags()} | err();
            ({tuple(), [string()]}) ->
-               {tuple(), str_kvpairs(), str_kvpairs()} | err().
+               {tuple(), proplist(), flags()} | err().
 parse({error, _}=E) ->
     E;
 parse({Spec, ArgsAndFlags}) ->
@@ -462,18 +467,18 @@ parse(ArgsAndFlags) ->
             end
     end.
 
--spec parse_kv_args([string()]) -> err() | str_kvpairs().
+-spec parse_kv_args([string()]) -> err() | proplist().
 parse_kv_args(Args) ->
     parse_kv_args(Args, []).
 
 %% All args must be k/v args!
--spec parse_kv_args([string()], str_kvpairs()) -> err() | str_kvpairs().
+-spec parse_kv_args([string()], proplist()) -> err() | proplist().
 parse_kv_args([], Acc) ->
     Acc;
 parse_kv_args([Arg | Args], Acc) ->
     case string:tokens(Arg, "=") of
         [Key, Val] ->
-            parse_kv_args(Args, [{Key, Val} | Acc]);
+            parse_kv_args(Args, [{list_to_atom(Key), Val} | Acc]);
         [Key] ->
             {error, {invalid_kv_arg, Key}};
         _ ->
@@ -481,11 +486,11 @@ parse_kv_args([Arg | Args], Acc) ->
     end.
 
 
--spec parse_flags([string()]) -> err() | str_kvpairs().
+-spec parse_flags([string()]) -> err() | flags().
 parse_flags(Flags) ->
     parse_flags(Flags, [], []).
 
--spec parse_flags([string()], list(), [kvpair()]) -> [kvpair()] | err().
+-spec parse_flags([string()], list(), proplist()) -> proplist() | err().
 parse_flags([], [], Acc) ->
     Acc;
 parse_flags([], [Flag], Acc) ->
@@ -513,8 +518,8 @@ parse_flags([Val | _T], [], _Acc) ->
     {error, {invalid_flag, Val}}.
 
 -spec validate(err()) -> err();
-              ({tuple(), [kvpair()], [flags()]}) ->
-                  err() | {fun(), [kvpair()], flags()}.
+              ({tuple(), proplist(), [flags()]}) ->
+                  err() | {fun(), proplist(), flags()}.
 validate({error, _}=E) ->
     E;
 validate({Spec, Args0, Flags0}) ->
@@ -531,11 +536,11 @@ validate({Spec, Args0, Flags0}) ->
             end
     end.
 
--spec validate_args(keyspecs(), [kvpair()]) -> err() | [kvpair()].
+-spec validate_args(keyspecs(), proplist()) -> err() | proplist().
 validate_args(KeySpecs, Args) ->
     convert_args(KeySpecs, Args, []).
 
--spec convert_args(keyspecs(), [kvpair()], [kvpair()]) -> err() | [kvpair()].
+-spec convert_args(keyspecs(), proplist(), proplist()) -> err() | proplist().
 convert_args([], [], Acc) ->
     Acc;
 convert_args(_KeySpec, [], Acc) ->
@@ -555,7 +560,7 @@ convert_args(KeySpecs, [{Key, Val0} | Args], Acc) ->
             end
     end.
 
--spec convert_arg([{atom(), term()}], string(), string()) -> term().
+-spec convert_arg(proplist(), atom(), string()) -> err() | term().
 convert_arg(Spec, Key, Val) ->
     {typecast, Fun} = lists:keyfind(typecast, 1, Spec),
     try
@@ -564,11 +569,11 @@ convert_arg(Spec, Key, Val) ->
         {error, {invalid_argument, {Key, Val}}}
     end.
 
--spec validate_flags(flagspecs(), [kvpair()]) -> err() | flags().
+-spec validate_flags(flagspecs(), proplist()) -> err() | flags().
 validate_flags(FlagSpecs, Flags) ->
     convert_flags(FlagSpecs, Flags, []).
 
--spec convert_flags(flagspecs(), [kvpair()], flags()) -> err() | flags().
+-spec convert_flags(flagspecs(), proplist(), flags()) -> err() | flags().
 convert_flags([], [], Acc) ->
     Acc;
 convert_flags(_FlagSpecs, [], Acc) ->
@@ -597,7 +602,7 @@ convert_flags(FlagSpecs, [{Key, Val0} | Flags], Acc) ->
             end
     end.
 
--spec convert_flag([{atom(), term()}], string(), string()) -> err() | term().
+-spec convert_flag(proplist(), atom(), string()) -> err() | term().
 convert_flag(Spec, Key, Val) ->
     %% Flags don't necessarily have values, in which case Val is undefined here.
     %% Additionally, flag values can also be strings and not have typecast funs.
