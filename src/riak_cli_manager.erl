@@ -318,8 +318,7 @@ set_app_config(AppConfig, Flags) when length(Flags) =:= 1 ->
         all -> set_remote_app_config(AppConfig)
     end;
 set_app_config(_AppConfig, _Flags) ->
-    _ = app_config_flags_error(),
-    [].
+    app_config_flags_error().
 
 -spec set_local_app_config(app_config()) -> ok.
 set_local_app_config(AppConfig) ->
@@ -410,7 +409,7 @@ print_error({error, {invalid_flags, Flags}}) ->
 print_error({error, {invalid_flag_value, {Name, Val}}}) ->
     io:format("Invalid value: ~p for flag: ~p~n", [Val, Name]);
 print_error({error, {invalid_flag_combination, Msg}}) ->
-    io:format("Error: ~p~n", [Msg]);
+    io:format("Error: ~s~n", [Msg]);
 print_error({error, {invalid_value, Val}}) ->
     io:format("Invalid value: ~p~n", [Val]);
 print_error({error, {invalid_kv_arg, Arg}}) ->
