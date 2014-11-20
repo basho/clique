@@ -278,13 +278,13 @@ run_callback({Args, Flags}) ->
     [F(K, V, Flags) || {K, V, F} <- KVFuns].
 
 -spec get_config(err()) -> err();
-                ({str_proplist(), str_proplist()}) ->
-                    {app_config(), str_proplist(), flags()} | err().
+                ({proplist(), flags()}) ->
+                    {app_config(), proplist(), flags()} | err().
 get_config({error, _}=E) ->
     E;
 get_config({Args, Flags0}) ->
     [{schema, Schema}] = ets:lookup(?schema_table, schema),
-    Conf = [{cuttlefish_variable:tokenize(K), V} || {K, V} <- Args],
+    Conf = [{cuttlefish_variable:tokenize(atom_to_list(K)), V} || {K, V} <- Args],
     case cuttlefish_generator:minimal_map(Schema, Conf) of
         {error, _, Msg} ->
             {error, {invalid_config, Msg}};
@@ -298,7 +298,7 @@ get_config({Args, Flags0}) ->
     end.
 
 -spec set_config(err()) -> err();
-      ({app_config(), str_proplist(), flags()}) -> {proplist(), flags()}| err().
+      ({app_config(), proplist(), flags()}) -> {proplist(), flags()}| err().
 set_config({error, _}=E) ->
     E;
 set_config({AppConfig, Args, Flags}) ->
