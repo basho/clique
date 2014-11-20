@@ -166,7 +166,7 @@ get_env_status(Keys, AppKeyPairs, Flags) when length(Flags) =:= 1 ->
         all -> get_remote_env_status(Keys, AppKeyPairs)
     end;
 get_env_status(_Keys, _AppKeyPairs, _Flags) ->
-    _ = app_config_flags_error(),
+    print_error(app_config_flags_error()),
     [].
 
 -spec get_local_env_status([string()], [{atom(), atom()}]) -> status().
