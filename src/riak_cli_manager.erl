@@ -675,10 +675,12 @@ safe_rpc(Node, Module, Function, Args) ->
 
 spec() ->
     Cmd = ["riak-admin", "test", "something"],
-    KeySpecs = [{sample_size, {typecast, fun list_to_integer/1}}],
+    KeySpecs = [{sample_size, [{typecast, fun list_to_integer/1}]}],
     FlagSpecs = [{node, [{shortname, "n"},
                          {longname, "node"},
-                         {typecast, fun list_to_atom/1}]}],
+                         {typecast, fun list_to_atom/1}]},
+                 {force, [{shortname, "f"},
+                          {longname, "force"}]}],
     Callback = undefined,
     {Cmd, KeySpecs, FlagSpecs, Callback}.
 
@@ -714,5 +716,43 @@ parse_valueless_flags_test() ->
     %% Flags with no value, get the value undefined
     ?assert(lists:member({$f, undefined}, Flags)),
     ?assert(lists:member({'do-something', undefined}, Flags)).
+
+validate_valid_short_flag_test() ->
+    Spec = spec(),
+    Args = [],
+    Node = "dev2@127.0.0.1",
+    Flags = [{$n, Node}, {$f, undefined}],
+    {undefined, [], ConvertedFlags} = validate({Spec, Args, Flags}),
+    ?assert(lists:member({node, 'dev2@127.0.0.1'}, ConvertedFlags)),
+    ?assert(lists:member({force, undefined}, ConvertedFlags)).
+
+validate_valid_long_flag_test() ->
+    Spec = spec(),
+    Args = [],
+    Node = "dev2@127.0.0.1",
+    Flags = [{node, Node}, {force, undefined}],
+    {undefined, [], ConvertedFlags} = validate({Spec, Args, Flags}),
+    ?assert(lists:member({node, 'dev2@127.0.0.1'}, ConvertedFlags)),
+    ?assert(lists:member({force, undefined}, ConvertedFlags)).
+
+validate_invalid_flags_test() ->
+    Spec = spec(),
+    Args = [],
+    Node = "dev2@127.0.0.1",
+    InvalidFlags = [{'some-flag', Node},
+                    {$b, Node},
+                    {$a, undefined}],
+    [?assertMatch({error, _}, validate({Spec, Args, [F]})) || F <- InvalidFlags].
+
+validate_valid_args_test() ->
+    Spec = spec(),
+    Args = [{sample_size, "5"}],
+    {undefined, ConvertedArgs, []} = validate({Spec, Args, []}),
+    ?assertEqual(ConvertedArgs, [{sample_size, 5}]).
+
+validate_invalid_args_test() ->
+    Spec = spec(),
+    InvalidArgs = [{key, "value"}, {sample_size, "ayo"}],
+    [?assertMatch({error, _}, validate({Spec, [A], []})) || A <- InvalidArgs].
 
 -endif.
