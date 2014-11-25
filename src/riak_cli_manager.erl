@@ -669,3 +669,50 @@ safe_rpc(Node, Module, Function, Args) ->
         exit:{noproc, _NoProcDetails} ->
             {badrpc, rpc_process_down}
     end.
+
+-ifdef(TEST).
+-include_lib("eunit/include/eunit.hrl").
+
+spec() ->
+    Cmd = ["riak-admin", "test", "something"],
+    KeySpecs = [{sample_size, {typecast, fun list_to_integer/1}}],
+    FlagSpecs = [{node, [{shortname, "n"},
+                         {longname, "node"},
+                         {typecast, fun list_to_atom/1}]}],
+    Callback = undefined,
+    {Cmd, KeySpecs, FlagSpecs, Callback}.
+
+parse_valid_flag_test() ->
+    Spec = spec(),
+    Node = "dev2@127.0.0.1",
+    ArgsAndFlags = ["-n", Node],
+    {Spec, Args, Flags} = parse({Spec, ArgsAndFlags}),
+    ?assertEqual(Args, []),
+    ?assertEqual(Flags, [{$n, Node}]).
+
+parse_valid_args_and_flag_test() ->
+    Spec = spec(),
+    Node = "dev2@127.0.0.1",
+    ArgsAndFlags = ["key=value", "-n", Node],
+    {Spec, Args, Flags} = parse({Spec, ArgsAndFlags}),
+    ?assertEqual(Args, [{key, "value"}]),
+    ?assertEqual(Flags, [{$n, Node}]).
+
+%% All arguments must be of type k=v
+parse_invalid_kv_arg_test() ->
+    Spec = spec(),
+    Args = ["ayo"],
+    ?assertMatch({error, _}, parse({Spec, Args})).
+
+%% This succeeds, because we aren't validating the flag, just parsing
+%% Note: Short flags get parsed into tuples with their character as first elem
+%% Long flags get translated to atoms in the first elem of the tuple
+parse_valueless_flags_test() ->
+    Spec = spec(),
+    Args = ["-f", "--do-something"],
+    {Spec, _, Flags} = parse({Spec, Args}),
+    %% Flags with no value, get the value undefined
+    ?assert(lists:member({$f, undefined}, Flags)),
+    ?assert(lists:member({'do-something', undefined}, Flags)).
+
+-endif.
