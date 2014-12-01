@@ -104,6 +104,14 @@ Fun = fun show_handoff_limit/2,
 riak_cli:register_command(Cmd, KeySpecs, FlagSpecs, Fun).
 ```
 
+#### Command callback implementation
+The function which is registered as the callback for this command gets two arguments.
+One is a proplist of key/value pairs (if any, appropriately typecast as specified), and the 
+other is a proplist of flags (if any, also appropriately typecast).  The flags
+proplist contains the given "longname" converted to an atom as the proplist key.
+
+The expected return value of the callback function is `ok` or `{error, Reason}`.
+
 ### register_usage/2
 After a few iterations on this design, we realized that having usage strings
 embedded in command specs and autogenerating them wasn't the most
