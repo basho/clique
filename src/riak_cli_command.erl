@@ -24,8 +24,7 @@ register(Cmd, Keys, Flags, Fun) ->
 -spec run(err()) -> err();
          ({fun(), proplist(), proplist()})-> ok | err().
 run({error, _}=E) ->
-    riak_cli_error:print(E),
-    E;
+    riak_cli_error:format(E);
 run({Fun, Args, Flags}) ->
     Fun(Args, Flags).
 
