@@ -114,23 +114,23 @@ riak_cli:register_command(Cmd, KeySpecs, FlagSpecs, Fun).
 
 #### Command callback implementation
 The function which is registered as the callback for this command gets two
-arguments.  One is a proplist of key/value pairs (if any, appropriately
-typecast as specified), and the other is a proplist of flags (if any, also
-appropriately typecast).  If the user provided the "shortname" of a flag, it is
-provided as its character in the proplist.
+arguments.  One is a proplist of key/value pairs (with the value appropriately
+typecast as specified), and the other is a proplist of flags (with flag values
+if any appropriately typecast). Flags are passed as proplist with the key given
+as the longname as its atom type.
 
-For example if there was a command with a flag `--node` and a shortname of
-`-n`, the proplist key would be `$n` for the shortname usage and the atom
-`node` for the longname usage.
+Flags which do not take an explicit value (i.e., present or not) are currently
+passed with the value of `undefined`, but it would be wise to use `_` in case
+this value changes in the future.
 
-The return value of the callback function is thrown away unless it is tuple
-`{error, Reason}`.
+The return value of the callback function is thrown away unless it is the
+tuple `{error, Reason}`.
 
 ```erlang
-cmd_callback([] = _KVs, [{$n, Node}]) ->
-    cmd_callback([], [{node, Node}]);
-cmd_callback([], [{node, Node}]) ->
+cmd_callback([] = _KVs, [{node, Node}] = _Flags) ->
     do_cmd_callback(Node);
+cmd_callback([], [{all, _Value}]) ->
+    list:foreach(fun do_cmd_callback/1, get_all_nodes());
 cmd_callback([], []) ->
     %% no key/values or flags
     %% do default behavior
