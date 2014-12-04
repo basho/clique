@@ -49,9 +49,10 @@ text(IoList) ->
 column(Title, Values) ->
     {column, Title, Values}.
 
-%% @doc A table is a list of zipped lists of attribute/val pairs. Each zipped list
-%% represents a row and the first element of each pair in the first list is the
-%% title of the tables.
+%% @doc A table is constructed from a list of proplists. Each proplist
+%% represents a row in the table. The keys in the first row represent
+%% column headers; each following row (proplist) must contain the same
+%% number of taggled tuples but the keys are ignored.
 -spec table([[{atom() | string(), term()}]]) -> table().
 table(Proplists) ->
    {table, Proplists}.
