@@ -261,18 +261,20 @@ get_valid_mappings(KeysAndFlags) ->
             end
     end.
 
--spec valid_mappings([string()], [tuple()]) -> [tuple()].
+-spec valid_mappings([cuttlefish_variable:variable()], [tuple()]) -> [tuple()].
 valid_mappings(Keys, Mappings) ->
     lists:filter(fun(Mapping) ->
                      Key = element(2, Mapping),
                      lists:member(Key, Keys)
                  end, Mappings).
 
+-spec invalid_keys([cuttlefish_variable:variable()],
+                   [cuttlefish_mapping:mapping()]) -> [string()].
 invalid_keys(Keys, Mappings) ->
     Invalid = lists:filter(fun(Key) ->
                                not lists:keymember(Key, 2, Mappings)
                            end, Keys),
-    [cuttlefish_variable:format(I)++" " || I <- Invalid].
+   [cuttlefish_variable:format(I)++" " || I <- Invalid].
 
 -spec get_env_keys(list(tuple())) -> [{atom(), atom()}].
 get_env_keys(Mappings) ->

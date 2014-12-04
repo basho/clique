@@ -19,7 +19,7 @@ format({error, {invalid_flag, Str}}) ->
 format({error, {invalid_action, Str}}) ->
     status(io_lib:format("Invalid Action: ~p~n", [Str]));
 format({error, invalid_number_of_args}) ->
-    status(io_lib:format("Invalid number of arguments~n"));
+    status("Invalid number of arguments~n");
 format({error, {invalid_argument, Str}}) ->
     status(io_lib:format("Invalid argument: ~p~n", [Str]));
 format({error, {invalid_flags, Flags}}) ->
