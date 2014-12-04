@@ -1,3 +1,3 @@
 -module(riak_cli_handler).
 
--callback register() -> ok.
+-callback register_cli() -> ok.
