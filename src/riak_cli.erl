@@ -1,7 +1,8 @@
 -module(riak_cli).
 
 %% API
--export([register_node_finder/1,
+-export([register/1,
+         register_node_finder/1,
          register_command/4,
          register_config/2,
          register_usage/2,
@@ -9,6 +10,11 @@
          print/1]).
 
 -type err() :: {error, term()}.
+
+-spec register([module()]) -> ok.
+register(Modules) ->
+    [M:register_cli() || M <- Modules],
+    ok.
 
 %% @doc RPC calls when using the --all flag need a list of nodes to contact.
 %% However, using nodes() only provides currently connected nodes. We want to
