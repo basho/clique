@@ -38,7 +38,8 @@ register_usage(Cmd, Usage) ->
 %% @doc Take a status type and generate console output
 -spec print(err() | riak_cli_status:status()) -> ok.
 print({error, _}=E) ->
-    riak_cli_error:print(E);
+    Alert = riak_cli_error:format(E),
+    print(Alert);
 print(Status) ->
     Output = riak_cli_writer:write(Status),
     io:format("~s", [Output]),
@@ -47,9 +48,11 @@ print(Status) ->
 %% @doc Run a config operation or command
 -spec run([string()]) -> ok | {error, term()}.
 run([_Script, "set" | Args]) ->
-    riak_cli_config:set(Args);
+    print(riak_cli_config:set(Args));
 run([_Script, "show" | Args]) ->
     print(riak_cli_config:show(Args));
+run([_Script, "describe" | Args]) ->
+    print(riak_cli_config:describe(Args));
 run(Cmd0) ->
     case is_help(Cmd0) of
         {ok, Cmd} ->

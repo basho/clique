@@ -4,8 +4,8 @@
 -export([init/0,
          register/2,
          show/1,
-         set/1]).
-         %%describe/1]).
+         set/1,
+         describe/1]).
 
 %% Callbacks for rpc calls
 -export([get_local_env_status/2,
@@ -41,6 +41,8 @@ show(KeysAndFlags) ->
     case get_valid_mappings(KeysAndFlags) of
         {error, _}=E ->
             E;
+        {_Keys, [], _Flags} ->
+            {error, config_no_args};
         {Keys, Mappings, Flags0}->
             AppKeyPairs = get_env_keys(Mappings),
             case riak_cli_parser:validate_flags(config_flags(), Flags0) of
@@ -51,19 +53,36 @@ show(KeysAndFlags) ->
             end
     end.
 
--spec set([string()]) -> ok | err().
+-spec describe([string()]) -> riak_cli_status:status() | err().
+describe(KeysAndFlags) ->
+    case get_valid_mappings(KeysAndFlags) of
+        {error, _}=E ->
+            E;
+        {_Keys, [], _Flags} ->
+            {error, config_no_args};
+        %% TODO: Do we want to allow any flags? --verbose maybe?
+        {_Keys, Mappings, _Flags0} ->
+            [begin
+                 Doc = cuttlefish_mapping:doc(M),
+                 Name = cuttlefish_variable:format(cuttlefish_mapping:variable(M)),
+                 riak_cli_status:text(Name ++ ":\n  " ++ Doc ++ "\n")
+             end || M <- Mappings]
+    end.
+
+-spec set([string()]) -> status() | err().
 set(ArgsAndFlags) ->
     M1 = riak_cli_parser:parse(ArgsAndFlags),
     M2 = get_config(M1),
     M3 = set_config(M2),
     case run_callback(M3) of
         {error, _}=E ->
-            riak_cli_error:print(E);
+            E;
         _ ->
-            ok
+            []
     end.
 
--spec get_env_status([string()], [{atom(), atom()}], flags()) -> status().
+-spec get_env_status([string()], [{atom(), atom()}], flags()) -> status() |
+                                                                 err().
 get_env_status(Keys, AppKeyPairs, []) ->
     get_local_env_status(Keys, AppKeyPairs);
 get_env_status(Keys, AppKeyPairs, Flags) when length(Flags) =:= 1 ->
@@ -73,8 +92,7 @@ get_env_status(Keys, AppKeyPairs, Flags) when length(Flags) =:= 1 ->
         all -> get_remote_env_status(Keys, AppKeyPairs)
     end;
 get_env_status(_Keys, _AppKeyPairs, _Flags) ->
-    riak_cli_error:print(app_config_flags_error()),
-    [].
+    app_config_flags_error().
 
 -spec get_local_env_status([string()], [{atom(), atom()}]) -> status().
 get_local_env_status(Keys, AppKeyPairs) ->
@@ -140,6 +158,8 @@ run_callback({Args, Flags}) ->
                     {proplist(), proplist(), flags()} | err().
 get_config({error, _}=E) ->
     E;
+get_config({[], _Flags}) ->
+    {error, config_no_args};
 get_config({Args, Flags0}) ->
     [{schema, Schema}] = ets:lookup(?schema_table, schema),
     Conf = [{cuttlefish_variable:tokenize(atom_to_list(K)), V} || {K, V} <- Args],
@@ -249,9 +269,10 @@ valid_mappings(Keys, Mappings) ->
                  end, Mappings).
 
 invalid_keys(Keys, Mappings) ->
-    lists:filter(fun(Key) ->
-                    not lists:keymember(Key, 2, Mappings)
-                 end, Keys).
+    Invalid = lists:filter(fun(Key) ->
+                               not lists:keymember(Key, 2, Mappings)
+                           end, Keys),
+    [cuttlefish_variable:format(I)++" " || I <- Invalid].
 
 -spec get_env_keys(list(tuple())) -> [{atom(), atom()}].
 get_env_keys(Mappings) ->

@@ -5,7 +5,8 @@
          text/1,
          column/2,
          table/1,
-         alert/1]).
+         alert/1,
+         is_status/1]).
 
 
 -include("riak_cli_status_types.hrl").
@@ -25,6 +26,19 @@ parse([{alert, Elem} | T], Fun, Acc) ->
 parse([Elem | T], Fun, Acc) ->
     Acc1 = Fun(Elem, Acc),
     parse(T, Fun, Acc1).
+
+%% @doc Is the given value a status type?
+-spec is_status(any()) -> boolean().
+is_status({text, _}) ->
+    true;
+is_status({column, _, _}) ->
+    true;
+is_status({table, _, _}) ->
+    true;
+is_status({alert, _}) ->
+    true;
+is_status(_) ->
+    false.
 
 -spec text(iolist()) -> text().
 text(IoList) ->
