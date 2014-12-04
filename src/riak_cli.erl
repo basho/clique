@@ -41,14 +41,14 @@ register_command(Cmd, Keys, Flags, Fun) ->
 register_usage(Cmd, Usage) ->
     riak_cli_usage:register(Cmd, Usage).
 
-%% @doc Take a status type and generate console output
+%% @doc Take a list of status types and generate console output
 -spec print(err() | riak_cli_status:status()) -> ok.
 print({error, _}=E) ->
     Alert = riak_cli_error:format(E),
     print(Alert);
 print(Status) ->
     Output = riak_cli_writer:write(Status),
-    io:format("~s", [Output]),
+    io:format("~ts", [Output]),
     ok.
 
 %% @doc Run a config operation or command
@@ -80,4 +80,3 @@ is_help(Str) ->
         false ->
             false
     end.
-

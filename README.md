@@ -241,6 +241,6 @@ The status api lives [here](https://github.com/basho/riak_cli/blob/develop/src/r
 
 ## Outputting status types
 
-The status types can be converted to visual text representation via [riak_cli_writer:write/1](https://github.com/basho/riak_cli/blob/develop/src/riak_cli_writer.erl).
+The status types can be converted to a string representation via [riak_cli_writer:write/1](https://github.com/basho/riak_cli/blob/develop/src/riak_cli_writer.erl) or sent directly to the console via [riak_cli:print/1](https://github.com/basho/riak_cli/blob/develop/src/riak_cli.erl)
 
 `write` takes a list of status objects as an argument.
