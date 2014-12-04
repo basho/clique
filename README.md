@@ -34,7 +34,7 @@ $ dev/dev1/bin/riak-admin handoff status
 
 # Erlang API
 The public API lives in
-[riak_cli.erl](https://github.com/basho/riak_cli/blob/master/src/riak_cli.erl).
+[riak_cli.erl](https://github.com/basho/riak_cli/blob/develop/src/riak_cli.erl).
 Users register functionality for given commands and configuration. When a
 command is run, the code is appropriately dispatched so that the registered
 actions are used. The goal is to minimize the user API, while making the overall
@@ -67,7 +67,7 @@ register_cli() ->
 
 ### register_node_finder/1
 Configuration can be set and shown across nodes. In order to contact the
-appropriate nodes, the application needs to tell `riak_cli` how to determine that. 
+appropriate nodes, the application needs to tell `riak_cli` how to determine that.
 `riak_core` would do this in the following manner:
 
 ```erlang
@@ -96,7 +96,7 @@ on the command-line. The flags can be either '--all' to run on all nodes, or
 on the local node (where the cli command was run) only.
 
 ```erlang
--spec set_transfer_limit(Key :: [string()], Val :: string(), 
+-spec set_transfer_limit(Key :: [string()], Val :: string(),
                          Flags :: [{atom(), proplist()}]).
 ...
 
@@ -117,7 +117,7 @@ manner:
 ```erlang
 %% Note that flags will be typecast using the typecast function and passed back
 %% in the proplist as the converted type and not a string.
-%% 
+%%
 Cmd = ["riak-admin", "handoff", "limit"],
 %% Keyspecs look identical to flagspecs but only have a typecast property.
 %% There are no key/value arguments for this command
@@ -131,7 +131,7 @@ riak_cli:register_command(Cmd, KeySpecs, FlagSpecs, Fun).
 
 #### Command callback implementation
 The function which is registered as the callback for this command gets two arguments.
-One is a proplist of key/value pairs (if any, appropriately typecast as specified), and the 
+One is a proplist of key/value pairs (if any, appropriately typecast as specified), and the
 other is a proplist of flags (if any, also appropriately typecast).  The flags
 proplist contains the given "longname" converted to an atom as the proplist key.
 
@@ -213,8 +213,7 @@ this it requires status to be formatted in a specific manner when returned from
 a command. All custom commands should return a type of `riak_cli_status:status()`.
 An example is above in the documentation for `print/1`.
 
-The entire status api lives [here](https://github.com/basho/riak_cli/blob/master/src/riak_cli_status.erl).
+The entire status api lives [here](https://github.com/basho/riak_cli/blob/develop/src/riak_cli_status.erl).
 
 The api functions should be used instead of creating the status types directly.
-The status types are output via the [riak_cli_writer](https://github.com/basho/riak_cli/blob/master/src/riak_cli_writer.erl).
-
+The status types are output via the [riak_cli_writer](https://github.com/basho/riak_cli/blob/develop/src/riak_cli_writer.erl).
