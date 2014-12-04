@@ -40,6 +40,31 @@ command is run, the code is appropriately dispatched so that the registered
 actions are used. The goal is to minimize the user API, while making the overall
 operation of the CLI more consistent.
 
+### register/1
+Register is a convenience function that should get called by an app with a list
+of modules that implement the ``riak_cli_handler`` behaviour. This behaviour
+implements a single callback: ``register_cli/0``. This callback is meant to wrap
+the other registration functions so that each individual command or logical set
+of commands can live in their own module and register themselves appropriately.
+
+```erlang
+%% Register the handler modules
+-module(riak_core_cli_registry).
+
+riak_cli:register([riak_core_cluster_status_handler]).
+```
+
+```erlang
+-module(riak_core_cluster_status_handler]).
+-export([register_cli/0]).
+
+-behaviour(riak_cli_handler).
+
+register_cli() ->
+    riak_cli:register_config(...),
+    riak_cli:register_command(...).
+```
+
 ### register_node_finder/1
 Configuration can be set and shown across nodes. In order to contact the
 appropriate nodes, the application needs to tell `riak_cli` how to determine that. 
