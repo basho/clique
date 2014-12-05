@@ -7,7 +7,13 @@
 -spec to_node(string()) -> node() | {error, bad_node}.
 to_node(Str) ->
     try
-        list_to_existing_atom(Str)
+        Node = list_to_existing_atom(Str),
+        case lists:member(Node, riak_cli_nodes:nodes()) of
+            true ->
+                Node;
+            false ->
+                {error, bad_node}
+        end
     catch error:badarg ->
         {error, bad_node}
     end.
