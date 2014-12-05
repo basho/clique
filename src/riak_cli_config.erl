@@ -209,8 +209,7 @@ set_local_app_config(AppConfig) ->
 set_remote_app_config(AppConfig, Node) ->
     Fun = set_local_app_config,
     case riak_cli_nodes:safe_rpc(Node, ?MODULE, Fun, [AppConfig]) of
-        {badrpc, rpc_process_down} ->
-            io:format("Error: Node ~p Down~n", [Node]),
+        {badrpc, _} ->
             ok;
         ok ->
             ok
@@ -231,7 +230,7 @@ set_remote_app_config(AppConfig) ->
 config_flags() ->
     [{node, [{shortname, "n"},
              {longname, "node"},
-             {typecast, fun list_to_atom/1},
+             {typecast, fun riak_cli_typecast:to_node/1},
              {description,
                  "The node to apply the operation on"}]},
 

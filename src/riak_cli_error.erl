@@ -38,9 +38,11 @@ format({error, {too_many_equal_signs, Arg}}) ->
 format({error, {invalid_config_keys, Invalid}}) ->
     status(io_lib:format("Invalid Config Keys: ~s~n", [Invalid]));
 format({error, config_no_args}) ->
-    status("Config Operations require one or more arguments.");
+    status("Config Operations require one or more arguments");
 format({error, {invalid_config, Msg}}) ->
-    status(io_lib:format("Invalid Configuration: ~p~n", [Msg])).
+    status(io_lib:format("Invalid Configuration: ~p~n", [Msg]));
+format({error, bad_node}) ->
+    status("Invalid node name").
 
 -spec status(string()) -> status().
 status(Str) ->
