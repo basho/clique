@@ -13,7 +13,7 @@
 
 -spec register([module()]) -> ok.
 register(Modules) ->
-    [M:register_cli() || M <- Modules],
+    _ = [M:register_cli() || M <- Modules],
     ok.
 
 %% @doc RPC calls when using the --all flag need a list of nodes to contact.
