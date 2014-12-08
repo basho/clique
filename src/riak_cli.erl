@@ -67,7 +67,7 @@ run(Cmd0) ->
             M0 = riak_cli_command:match(Cmd0),
             M1 = riak_cli_parser:parse(M0),
             M2 = riak_cli_parser:validate(M1),
-            riak_cli_command:run(M2)
+            print(riak_cli_command:run(M2))
     end.
 
 %% @doc Help flags always comes at the end of the command
