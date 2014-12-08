@@ -65,7 +65,7 @@ describe(KeysAndFlags) ->
             [begin
                  Doc = cuttlefish_mapping:doc(M),
                  Name = cuttlefish_variable:format(cuttlefish_mapping:variable(M)),
-                 riak_cli_status:text(Name ++ ":\n  " ++ Doc ++ "\n")
+                 riak_cli_status:text(Name ++ ":\n  " ++ string:join(Doc,"\n  ") ++ "\n")
              end || M <- Mappings]
     end.
 
