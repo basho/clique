@@ -11,6 +11,7 @@
 
 -type err() :: {error, term()}.
 -type proplist() :: [{atom(), term()}].
+-type status() :: riak_cli_status:status().
 
 init() ->
     _ = ets:new(?cmd_table, [public, named_table]),
@@ -22,9 +23,9 @@ register(Cmd, Keys, Flags, Fun) ->
     ets:insert(?cmd_table, {Cmd, Keys, Flags, Fun}).
 
 -spec run(err()) -> err();
-         ({fun(), proplist(), proplist()})-> ok | err().
+         ({fun(), proplist(), proplist()})-> status().
 run({error, _}=E) ->
-    riak_cli_error:format(E);
+    E;
 run({Fun, Args, Flags}) ->
     Fun(Args, Flags).
 
