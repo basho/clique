@@ -20,8 +20,13 @@ format({error, {invalid_action, Str}}) ->
     status(io_lib:format("Invalid Action: ~p~n", [Str]));
 format({error, invalid_number_of_args}) ->
     status("Invalid number of arguments~n");
+format({error, {invalid_key, Str}}) ->
+    status(io_lib:format("Invalid key: ~p~n", [Str]));
 format({error, {invalid_argument, Str}}) ->
     status(io_lib:format("Invalid argument: ~p~n", [Str]));
+format({error, {invalid_args, Args}}) ->
+    Arglist = lists:map(fun({Key, Val}) -> io_lib:format("~ts=~ts ", [Key, Val]) end, Args),
+    status(io_lib:format("Invalid arguments: ~s~n", [Arglist]));
 format({error, {invalid_flags, Flags}}) ->
     status(io_lib:format("Invalid Flags: ~p~n", [Flags]));
 format({error, {invalid_flag_value, {Name, Val}}}) ->
