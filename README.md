@@ -67,7 +67,7 @@ register_cli() ->
 
 ### register_node_finder/1
 Configuration can be set and shown across nodes. In order to contact the
-appropriate nodes, the application needs to tell `riak_cli` how to determine that. 
+appropriate nodes, the application needs to tell `riak_cli` how to determine that.
 `riak_core` would do this in the following manner:
 
 ```erlang
@@ -96,7 +96,7 @@ on the command-line. The flags can be either '--all' to run on all nodes, or
 on the local node (where the cli command was run) only.
 
 ```erlang
--spec set_transfer_limit(Key :: [string()], Val :: string(), 
+-spec set_transfer_limit(Key :: [string()], Val :: string(),
                          Flags :: [{atom(), proplist()}]).
 ...
 
@@ -105,14 +105,22 @@ Callback = fun set_transfer_limit/3,
 riak_cli:register_config(Key, Callback).
 ```
 
+#### A useful pattern
+A good idea would be to centralize the command and usage registrations
+into a single function for each module which implements CLI callbacks.
+
+When starting an OTP-compliant application, make calls to these centralized
+functions in the application's `start/2` call. (This is typically in the
+`appname_app.erl` module.)
+
 ### register_command/4
 Users can create their own CLI commands that are not directly configuration
 related. These commands are relatively free-form, with the only restrictions
 being that arguments are key/value pairs and flags come after arguments. For
 example: `riak-admin transfer limit --node=dev2@127.0.0.1`. In this case the
-command is "riak-admin transfer limit" which gets passed a `--node` flag. There are no k/v
-arguments. These commands can be registered with riak_cli in the following
-manner:
+command is "riak-admin transfer limit" which gets passed a `--node` flag. There
+are no k/v arguments. These commands can be registered with riak_cli in the
+following manner:
 
 ```erlang
 %% Note that flags will be typecast using the typecast function and passed back
@@ -130,12 +138,39 @@ riak_cli:register_command(Cmd, KeySpecs, FlagSpecs, Fun).
 ```
 
 #### Command callback implementation
-The function which is registered as the callback for this command gets two arguments.
-One is a proplist of key/value pairs (if any, appropriately typecast as specified), and the 
-other is a proplist of flags (if any, also appropriately typecast).  The flags
-proplist contains the given "longname" converted to an atom as the proplist key.
+The function which is registered as the callback for this command gets two
+arguments.  One is a proplist of key/value pairs (with the value appropriately
+typecast as specified), and the other is a proplist of flags (with flag values
+if any appropriately typecast). Flags are passed as proplist with the key given
+as the longname as its atom type.
 
-The expected return value of the callback function is `ok` or `{error, Reason}`.
+Flags which do not take an explicit value (i.e., present or not) are currently
+passed with the value of `undefined`, but it would be wise to use `_` in case
+this value changes in the future.
+
+The return value of the callback function is thrown away unless it is the
+tuple `{error, Reason}`.
+
+```erlang
+cmd_callback([] = _KVs, [{node, Node}] = _Flags) ->
+    do_cmd_callback(Node);
+cmd_callback([], [{all, _Value}]) ->
+    list:foreach(fun do_cmd_callback/1, get_all_nodes());
+cmd_callback([], []) ->
+    %% no key/values or flags
+    %% do default behavior
+    do_cmd_callback(node()).
+
+do_cmd_callback(Node) ->
+    case frobulate(Node) of
+        ok ->
+            io:format("Success!~n", []);
+        {error, Reason} ->
+            {error, Reason};
+        Other ->
+            io:format("Weird! I got ~p~n", [Other])
+    end.
+```
 
 ### register_usage/2
 After a few iterations on this design, we realized that having usage strings
@@ -217,4 +252,3 @@ The entire status api lives [here](https://github.com/basho/riak_cli/blob/master
 
 The api functions should be used instead of creating the status types directly.
 The status types are output via the [riak_cli_writer](https://github.com/basho/riak_cli/blob/master/src/riak_cli_writer.erl).
-
