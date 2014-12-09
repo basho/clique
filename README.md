@@ -173,22 +173,6 @@ riak_cli:register_usage(["riak-admin", "handoff"], handoff_usage()),
 riak_cli:register_usage(["riak-admin", "handoff", "limit"], handoff_limit_usage()).
 ```
 
-### print/1
-In some cases, user code will have a status formatted output generated using
-riak_cli_status.erl. It may want to format this for display on the console. In
-that case it would take the given status and call ``riak_cli:print(Status)``.
-
-```erlang
-%% The first element of the first row's elements is used as the titles for the
-%% columns. All rows should have matching proplists forms.
-Table = [[{node, "dev1@127.0.0.1"}, {num_connections, 100}],
-          {node, "dev2@127.0.0.1"}, {num_connections, 90}]],
-
-%% Note that a Status is a list of riak_cli_status formatted values.
-Status = [riak_cli_status:table(Table)],
-riak_cli:print(Status).
-```
-
 ### run/1
 This is the simplest command to use of all. It takes a given command as a list of
 strings and attempts to run the command using the registered information. If
@@ -211,7 +195,6 @@ command(Cmd) ->
 Riak CLI provides pretty printing support for status information. In order to do
 this it requires status to be formatted in a specific manner when returned from
 a command. All custom commands should return a type of `riak_cli_status:status()`.
-An example is above in the documentation for `print/1`.
 
 ## Types
 
@@ -232,17 +215,3 @@ See descriptions above for the arguments to each.
 * `riak_cli_status:column/2` - Takes a title (`iolist`) and values (a list of `iolist`) intended to be displayed consecutively.
 * `riak_cli_status:table/1` - Takes a list of proplists, each representing a row in the table. The keys in the first row represent column headers; each following row (proplist) must contain the same number of tagged tuples but the keys are ignored.
 * `riak_cli_status:alert/1` - Takes a list of status types representing an error condition.
-
-
-## Other functions
-
-* `is_status/1` - True or false depending on whether the Erlang term argument reflects one of the 4 status types.
-* `parse/3` - a fold over a list of status objects. Takes the list, a function with two arguments (status object, accumulator) and the initial value for the accumulator as arguments.
-
-The status api lives [here](https://github.com/basho/riak_cli/blob/develop/src/riak_cli_status.erl).
-
-## Outputting status types
-
-The status types can be converted to a string representation via [riak_cli_writer:write/1](https://github.com/basho/riak_cli/blob/develop/src/riak_cli_writer.erl) or sent directly to the console via [riak_cli:print/1](https://github.com/basho/riak_cli/blob/develop/src/riak_cli.erl)
-
-Each takes a list of status objects as an argument.
