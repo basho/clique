@@ -52,7 +52,7 @@ column(Title, Values) ->
 %% @doc A table is constructed from a list of proplists. Each proplist
 %% represents a row in the table. The keys in the first row represent
 %% column headers; each following row (proplist) must contain the same
-%% number of taggled tuples but the keys are ignored.
+%% number of tagged tuples but the keys are ignored.
 -spec table([[{atom() | string(), term()}]]) -> table().
 table(Proplists) ->
    {table, Proplists}.

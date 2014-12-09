@@ -230,7 +230,7 @@ See descriptions above for the arguments to each.
 
 * `riak_cli_status:text/1` - Takes an `iolist`, returns a `text` object.
 * `riak_cli_status:column/2` - Takes a title (`iolist`) and values (a list of `iolist`) intended to be displayed consecutively.
-* `riak_cli_status:table/1` - Takes a list of proplists, each representing a row in the table. The keys in the first row represent column headers; each following row (proplist) must contain the same number of taggled tuples but the keys are ignored.
+* `riak_cli_status:table/1` - Takes a list of proplists, each representing a row in the table. The keys in the first row represent column headers; each following row (proplist) must contain the same number of tagged tuples but the keys are ignored.
 * `riak_cli_status:alert/1` - Takes a list of status types representing an error condition.
 
 
