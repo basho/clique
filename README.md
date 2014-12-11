@@ -179,10 +179,8 @@ arguments. These commands can be registered with riak_cli in the following
 manner:
 
 ```erlang
-%% Note that flags will be typecast using the typecast function and passed back
-%% in the proplist as the converted type and not a string.
-%%
 Cmd = ["riak-admin", "handoff", "limit"],
+
 %% Keyspecs look identical to flagspecs but only have a typecast property.
 %% There are no key/value arguments for this command
 KeySpecs = [],
@@ -200,11 +198,7 @@ FlagSpecs = [{node, [{shortname, "n"},
 %%
 %% This pattern matching works here because we know we only allow one flag in
 %% the flagspec, and the callback only ever fires with valid flags.
-Callback = fun([]=_Keys, [{node, NodeStr}]=Flags) ->
-               %% In the future this will not be needed as we will pass
-               %% back the already typecast value
-               Node = riak_cli_typecast:to_node(NodeStr),
-
+Callback = fun([]=_Keys, [{node, Node}]=Flags) ->
                case riak_cli_nodes:safe_rpc(Node, somemod, somefun, []) of
                    {error, _} ->
                        Text = riak_cli_status:text("Failed to Do Something"),
