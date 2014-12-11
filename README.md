@@ -30,7 +30,7 @@ Riak CLI provides the application developer with the following capabilities:
    configuration across one or all nodes: i.e.  `riak-admin set anti-entropy=on --all`
  * Return a standard status format that allows output of a variety of content
    types: human-readable, csv, html, etc... (Note that currently only
-   human-readable output is implmented)
+   human-readable output is implemented)
 
 ### Why Not Riak CLI ?
  * You aren't writing a CLI
@@ -45,7 +45,7 @@ Riak CLI provides a consistent and flexible interface to the end user of your
 application. In the interest of clarity, a few examples will be given to
 illustrate common usage.
 
-```shell
+```console
 # Show the configuration for 2 config variables. Multiple values can be
 # shown by using spaces between them. The --all flag means: give me the values
 # on all nodes in the cluster.
@@ -139,7 +139,9 @@ F = fun() ->
 riak_cli:register_node_finder(F).
 ```
 
-Note that this function should only be called once per beam.
+Note that this function only needs to be called once per beam. The callback
+itself is stored in an ets table, and calling `riak_cli:register_node_finder/1`
+again will overwrite it with a new function.
 
 ### register_config/2
 Showing, setting and describing configuration variables is handled automatically
@@ -198,7 +200,7 @@ FlagSpecs = [{node, [{shortname, "n"},
 %%
 %% This pattern matching works here because we know we only allow one flag in
 %% the flagspec, and the callback only ever fires with valid flags.
-Callback = fun([]=_Keys, [{node, Node}]=Flags) ->
+Callback = fun([]=_Keys, [{node, Node}]=_Flags) ->
                case riak_cli_nodes:safe_rpc(Node, somemod, somefun, []) of
                    {error, _} ->
                        Text = riak_cli_status:text("Failed to Do Something"),
@@ -214,7 +216,6 @@ Callback = fun([]=_Keys, [{node, Node}]=Flags) ->
 
 riak_cli:register_command(Cmd, KeySpecs, FlagSpecs, Callback).
 ```
-#### Command callback implementation
 
 ### register_usage/2
 We want to show usage explicitly in many cases, and not with the `--help` flag.
@@ -252,9 +253,16 @@ riak_cli:register_usage(["riak-admin", "handoff", "limit"], handoff_limit_usage(
 ### run/1
 `run/1` takes a given command as a list of strings and attempts to run the
 command using the registered information. If called with `set`, `show`, or
-describe as the first parameter the command is treated as configuration. `run/1`
+`describe` as the second argument in the list, the command is treated as
+configuration. Note that the first argument is the program/script name. `run/1`
 should only need to be called in one place in a given application. In riak_core
-it gets called in ``riak_core_console:command/1``.
+it gets called in ``riak_core_console:command/1`` via an rpc call from Nodetool
+in the `riak-admin` shell script. The list of arguments given to run are the
+actual arguments given in the shell and provided by Nodetool as a list of
+strings. This format is the same format in which command line arguments get
+passed to an escript `main/1` function. The difference is that when using
+Nodetool you typically also pass the name of the script as the first argument,
+while escripts only pass the paramaters not including the script name (argv0).
 
 ```erlang
 %% New CLI API
@@ -290,5 +298,5 @@ See descriptions above for the arguments to each.
 
 * ``riak_cli_status:text/1`` - Takes an `iolist`, returns a `text` object.
 * `riak_cli_status:column/2` - Takes a title (`iolist`) and values (a list of `iolist`) intended to be displayed consecutively.
-* `riak_cli_status:table/1` - Takes a list of proplists, each representing a row in the table. The keys in the first row represent column headers; each following row (proplist) must contain the same number of tagged tuples but the keys are ignored.
+* `riak_cli_status:table/1` - Takes a list of proplists, each representing a row in the table. The keys in the first row represent column headers; each following row (proplist) must contain the same number of tagged tuples in the same order, and the keys are ignored.
 * `riak_cli_status:alert/1` - Takes a list of status types representing an error condition.
