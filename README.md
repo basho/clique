@@ -1,20 +1,56 @@
-Riak CLI is a library for building command line interfaces in Erlang. It provides
-command and option parsing, configuration showing and setting using cuttlefish,
-and a small status type API that enables pretty printing.
+# Introduction
+Riak CLI is an opinionated framework for building command line interfaces in
+Erlang. It provides users with an interface that gives them enough power to
+build complex CLIs, but enough constraint to make them appear consistent.
+
+### Why Riak CLI ?
+When building a CLI for an Erlang application users frequently run into the following
+problems:
+
+  * Output is inconsistent across commands and often implemented differently for
+    each command with little re-use.
+  * Output is frequently hard to read for humans, hard to parse for machines, or
+    both.
+  * Adding a new command to the system often results in glue code and extra work
+    rather than just writing a function that gathers information or performs a
+    given user action.
+  * Setting and showing configuration often only works on a single node.
+  * Configuration changes with runtime side effects are often difficult to
+    implement.
+
+Riak CLI provides a standard way of implementing status, command, usage and
+configuration functionality while minimizing the amount of code needed to be
+written by users of the library.
+
+Riak CLI provides the application developer with the following capabilities:
+ * Implement callbacks that handle a given cli command such as `riak-admin handoff enable outbound`
+ * Register usage points to show the correct usage in the command hierarchy when
+   an incomplete command is run or the user issues the `--help` flag.
+ * Set, show and describe [cuttlefish](https://github.com/basho/cuttlefish)
+   configuration across one or all nodes: i.e.  `riak-admin set anti-entropy=on --all`
+ * Return a standard status format that allows output of a variety of content
+   types: human-readable, csv, html, etc... (Note that currently only
+   human-readable output is implemented)
+
+### Why Not Riak CLI ?
+ * You aren't writing a CLI
+ * You don't want or need to use cuttlefish for configuration
+ * You only have a few command permutations and the dependency would be overkill
+ * You already wrote your own cli tool
+ * You are a masochist
+ * You dislike your users
 
 # CLI usage
-``riak_cli`` allows you define a command line interface using the Erlang API
-described below. The interface provides both configuration and arbitrary
-command handling. In the interest of clarity, a few examples will be given to
-illustrate its usage.
+Riak CLI provides a consistent and flexible interface to the end user of your
+application. In the interest of clarity, a few examples will be given to
+illustrate common usage.
 
-```shell
-
+```console
 # Show the configuration for 2 config variables. Multiple values can be
 # shown by using spaces between them. The --all flag means: give me the values
 # on all nodes in the cluster.
 
-$ dev/dev1/bin/riak-admin show transfer_limit leveldb.limited_developer_mem --all
+$ riak-admin show transfer_limit leveldb.limited_developer_mem --all
 +--------------+--------------+-----------------------------+
 |     Node     |transfer_limit|leveldb.limited_developer_mem|
 +--------------+--------------+-----------------------------+
@@ -22,26 +58,51 @@ $ dev/dev1/bin/riak-admin show transfer_limit leveldb.limited_developer_mem --al
 |dev2@127.0.0.1|      6       |            true             |
 +--------------+--------------+-----------------------------+
 
-
 # Set the transfer_limit config on dev2
-$ dev/dev1/bin/riak-admin set transfer_limit=6 --node=dev2@127.0.0.1
+$ riak-admin set transfer_limit=6 --node=dev2@127.0.0.1
 Set transfer limit for 'dev2@127.0.0.1' to 6
 
-# Run an aribtrary, user defined command (this one doesn't exist... yet)
-$ dev/dev1/bin/riak-admin handoff status
+# Describe 1 or more configuration variables
+# Note that the descriptions are the doc comments in the cuttlefish schema
+$ riak-admin describe transfer_limit storage_backend
+transfer_limit:
+  Number of concurrent node-to-node transfers allowed.
+
+storage_backend:
+  Specifies the storage engine used for Riak's key-value data
+  and secondary indexes (if supported).
+
+# Run an aribtrary, user defined command
+$ riak-admin handoff enable outbound
+Handoff setting successfully updated
+
+# Show usage information when a command is incompletely specified
+$ riak-admin handoff enable
+Usage: riak-admin handoff <enable | disable> <inbound | outbound | both> [[--node | -n] <Node>] [--all]
+
+  Enable or disable handoffs on the specified node(s).
+  If handoffs are disabled in a direction, any currently
+  running handoffs in that direction will be terminated.
+
+Options
+  -n <Node>, --node <Node>
+     Modify the setting on the specified node (default: local node only)
+  -a, --all
+     Modify the setting on every node in the cluster
 
 ```
 
 # Erlang API
-The public API lives in
-[riak_cli.erl](https://github.com/basho/riak_cli/blob/develop/src/riak_cli.erl).
-Users register functionality for given commands and configuration. When a
-command is run, the code is appropriately dispatched so that the registered
-actions are used. The goal is to minimize the user API, while making the overall
-operation of the CLI more consistent.
+Riak CLI handles all parsing, validation, and type conversion of input data in a
+manner similar to getopt. Riak CLI also handles all formatting and output of
+status. The user code registers specifications, usage documentation and
+callbacks in order to plug into Riak CLI. When a command is run, the code is
+appropriately dispatched via the registry. Each registered callback returns a
+[status type](https://github.com/basho/riak_cli/blob/develop/src/riak_cli_status.erl)
+that allows riak_cli to format the output in a standardized way.
 
 ### register/1
-Register is a convenience function that should get called by an app with a list
+Register is a convenience function that gets called by an app with a list
 of modules that implement the ``riak_cli_handler`` behaviour. This behaviour
 implements a single callback: ``register_cli/0``. This callback is meant to wrap
 the other registration functions so that each individual command or logical set
@@ -67,8 +128,8 @@ register_cli() ->
 
 ### register_node_finder/1
 Configuration can be set and shown across nodes. In order to contact the
-appropriate nodes, the application needs to tell `riak_cli` how to determine that.
-`riak_core` would do this in the following manner:
+appropriate nodes, the application needs to tell ``riak_cli`` how to determine that.
+``riak_core`` would do this in the following manner:
 
 ```erlang
 F = fun() ->
@@ -78,13 +139,18 @@ F = fun() ->
 riak_cli:register_node_finder(F).
 ```
 
+Note that this function only needs to be called once per beam. The callback
+itself is stored in an ets table, and calling `riak_cli:register_node_finder/1`
+again will overwrite it with a new function.
+
 ### register_config/2
-Showing and setting configuration is handled automatically via integration with
-cuttlefish. The application environment variables can be set across nodes using
-the installed cuttlefish schemas. In some instances however, a configuration
-change requires doing something else to the cluster besides just setting
-variables. For instance, when reducing the ``transfer_limit``, we want to
-shutdown any extra handoff processes so we don't exceed the new limit.
+Showing, setting and describing configuration variables is handled automatically
+via integration with cuttlefish. The application environment variables can be
+set across nodes using the installed cuttlefish schemas. In some instances
+however, a configuration change requires doing something else to the cluster
+besides just setting variables. For instance, when reducing the
+``transfer_limit``, we want to shutdown any extra handoff processes so we don't
+exceed the new limit.
 
 Configuration specific behaviour can be managed by registering a callback to
 fire when a given configuration variable is set on the cli. The callback runs
@@ -115,37 +181,48 @@ arguments. These commands can be registered with riak_cli in the following
 manner:
 
 ```erlang
-%% Note that flags will be typecast using the typecast function and passed back
-%% in the proplist as the converted type and not a string.
-%%
 Cmd = ["riak-admin", "handoff", "limit"],
+
 %% Keyspecs look identical to flagspecs but only have a typecast property.
 %% There are no key/value arguments for this command
 KeySpecs = [],
 FlagSpecs = [{node, [{shortname, "n"},
                      {longname, "node"},
-                     {typecast, fun list_to_atom/1}]}].
-Fun = fun show_handoff_limit/2,
-riak_cli:register_command(Cmd, KeySpecs, FlagSpecs, Fun).
+                     {typecast, fun riak_cli_typecast:to_node/1}]}].
+
+%% The function which is registered as the callback for this command gets two
+%% arguments. One is a proplist of key/value pairs (if any, appropriately
+%% typecast as specified), and the other is a proplist of flags (if any, also
+%% appropriately typecast). The flags proplist contains the given "longname"
+%% converted to an atom as the proplist key.
+%%
+%% The expected return value of the callback function is `riak_cli_status:status()`.
+%%
+%% This pattern matching works here because we know we only allow one flag in
+%% the flagspec, and the callback only ever fires with valid flags.
+Callback = fun([]=_Keys, [{node, Node}]=_Flags) ->
+               case riak_cli_nodes:safe_rpc(Node, somemod, somefun, []) of
+                   {error, _} ->
+                       Text = riak_cli_status:text("Failed to Do Something"),
+                       [riak_cli_status:alert([Text])];
+                   {badrpc, _} ->
+                       Text = riak_cli_status:text("Failed to Do Something"),
+                       [riak_cli_status:alert([Text])];
+                   Val ->
+                       Text = io_lib:format("Some Thing was done. Value = ~p~n", [Val]),
+                       [riak_cli_status:text(Text)]
+               end
+           end,
+
+riak_cli:register_command(Cmd, KeySpecs, FlagSpecs, Callback).
 ```
 
-#### Command callback implementation
-The function which is registered as the callback for this command gets two arguments.
-One is a proplist of key/value pairs (if any, appropriately typecast as specified), and the
-other is a proplist of flags (if any, also appropriately typecast). The flags
-proplist contains the given "longname" converted to an atom as the proplist key.
-
-The expected return value of the callback function is `ok` or `{error, Reason}`.
-
 ### register_usage/2
-After a few iterations on this design, we realized that having usage strings
-embedded in command specs and autogenerating them wasn't the most
-straightforward way to go. We want to show usage explicitly in many cases, and
-not with the `--help` flag. Furthermore we want to allow some flexibility in the
-output and enable long form documentation (properly formatted.) To make this
-easier, the user must explicitly register usage points. If one of these points
-is hit, the registered Usage string will be shown. Note that "Usage: " will be
-prepended to the string, so don't add that part in.
+We want to show usage explicitly in many cases, and not with the `--help` flag.
+To make this easier, the user must explicitly register usage points. If one of
+these points is hit, via longest match with the command string, the registered
+usage string will be shown. Note that "Usage: " will be prepended to the string,
+so don't add that part in.
 
 ```erlang
 handoff_usage() ->
@@ -174,13 +251,18 @@ riak_cli:register_usage(["riak-admin", "handoff", "limit"], handoff_limit_usage(
 ```
 
 ### run/1
-This is the simplest command to use of all. It takes a given command as a list of
-strings and attempts to run the command using the registered information. If
-called with `set` or `show` as the first parameter the command is treated as
-configuration and uses the registerd config callbacks and cuttlefish. Otherwise
-the command is not configuration related and the other registered info is
-used. This should only need to be called in one place in a given application. In
-riak_core it gets called in ``riak_core_console:command/1``.
+`run/1` takes a given command as a list of strings and attempts to run the
+command using the registered information. If called with `set`, `show`, or
+`describe` as the second argument in the list, the command is treated as
+configuration. Note that the first argument is the program/script name. `run/1`
+should only need to be called in one place in a given application. In riak_core
+it gets called in ``riak_core_console:command/1`` via an rpc call from Nodetool
+in the `riak-admin` shell script. The list of arguments given to run are the
+actual arguments given in the shell and provided by Nodetool as a list of
+strings. This format is the same format in which command line arguments get
+passed to an escript `main/1` function. The difference is that when using
+Nodetool you typically also pass the name of the script as the first argument,
+while escripts only pass the paramaters not including the script name (argv0).
 
 ```erlang
 %% New CLI API
@@ -188,17 +270,20 @@ riak_core it gets called in ``riak_core_console:command/1``.
 
 -spec command([string()]) -> ok.
 command(Cmd) ->
-    riak_cli_manager:run(Cmd).
+    %% Example Cmd = ["riak-admin", "handoff"]
+    %% This is the way arguments get passed in from a shell script using Nodetool.
+    %% They are passed into an escript main/1 function in the same manner, but
+    %% without the script name.
+    riak_cli:run(Cmd).
 ```
 
 # Status API
 Riak CLI provides pretty printing support for status information. In order to do
 this it requires status to be formatted in a specific manner when returned from
-a command. All custom commands should return a type of `riak_cli_status:status()`.
+a command. All custom commands should return a type of ``riak_cli_status:status()``.
 
 ## Types
-
-These are tagged tuples, but should be generated by invoking the status API instead of assembled directly.
+Types are abstract and should be generated by invoking the status API instead of assembled directly.
 
 * `text` - A text value.
 * `column` - A list of related values.
@@ -211,7 +296,7 @@ Only `alert` values contain nested status types; e.g., a table does not contain 
 
 See descriptions above for the arguments to each.
 
-* `riak_cli_status:text/1` - Takes an `iolist`, returns a `text` object.
+* ``riak_cli_status:text/1`` - Takes an `iolist`, returns a `text` object.
 * `riak_cli_status:column/2` - Takes a title (`iolist`) and values (a list of `iolist`) intended to be displayed consecutively.
-* `riak_cli_status:table/1` - Takes a list of proplists, each representing a row in the table. The keys in the first row represent column headers; each following row (proplist) must contain the same number of tagged tuples but the keys are ignored.
+* `riak_cli_status:table/1` - Takes a list of proplists, each representing a row in the table. The keys in the first row represent column headers; each following row (proplist) must contain the same number of tagged tuples in the same order, and the keys are ignored.
 * `riak_cli_status:alert/1` - Takes a list of status types representing an error condition.
