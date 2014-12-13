@@ -45,8 +45,10 @@ write_status(alert, Ctx) ->
     throw({error, nested_alert, Ctx});
 write_status(alert_done, Ctx) ->
     Ctx#context{alert_set=false};
-write_status({column, Title, Data}, Ctx=#context{output=Output}) ->
-    Ctx#context{output=Output++write_column(Title, Data)};
+write_status({list, Data}, Ctx=#context{output=Output}) ->
+    Ctx#context{output=Output++write_list(Data)};
+write_status({list, Title, Data}, Ctx=#context{output=Output}) ->
+    Ctx#context{output=Output++write_list(Title, Data)};
 write_status({text, Text}, Ctx=#context{output=Output}) ->
     Ctx#context{output=Output++Text++"\n"};
 write_status({table, Rows}, Ctx=#context{output=Output}) ->
@@ -63,16 +65,18 @@ write_table(Rows0) ->
     Table = riak_cli_table:autosize_create_table(Schema, Rows),
     io_lib:format("~ts~n", [Table]).
 
-%% @doc Write a column on a single line.
-write_column(Title, Items) when is_atom(Title) ->
-    write_column(atom_to_list(Title), Items);
+%% @doc Write a list horizontally
+write_list(Title, Items) when is_atom(Title) ->
+    write_list(atom_to_list(Title), Items);
 %% Assume all items are of same type
-write_column(Title, Items) when is_atom(hd(Items)) ->
+write_list(Title, Items) when is_atom(hd(Items)) ->
     Items2 = [atom_to_list(Item) || Item <- Items],
-    write_column(Title, Items2);
-write_column(Title, Items) ->
+    write_list(Title, Items2);
+write_list(Title, Items) ->
     %% Todo: add bold/color for Title when supported
+    Title ++ ":" ++ write_list(Items) ++ "\n".
+
+write_list(Items) ->
     lists:foldl(fun(Item, Acc) ->
                     Acc++" "++Item
-                end, Title++":", Items) ++ "\n".
-
+                end, "", Items).
