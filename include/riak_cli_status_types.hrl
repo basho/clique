@@ -4,8 +4,8 @@
 %% data structures and types and be able to generate human readable output, json,
 %% csv and a subset of html, as well as other possible output.
 -type text() :: {text, iolist()}.
--type column() :: {column, iolist(), [iolist()]}.
+-type status_list() :: {list, iolist(), [iolist()]} | {list, [iolist()]}.
 -type table() :: {table, [{iolist(), iolist()}]}.
--type alert() :: {alert, [column() | table() | text()]}.
--type elem() :: text() | column() | table() | alert().
+-type alert() :: {alert, [status_list() | table() | text()]}.
+-type elem() :: text() | status_list() | table() | alert().
 -type status() :: [elem()].

@@ -22,7 +22,8 @@
 %% API
 -export([parse/3,
          text/1,
-         column/2,
+         list/1,
+         list/2,
          table/1,
          alert/1,
          is_status/1]).
@@ -47,9 +48,11 @@ parse([Elem | T], Fun, Acc) ->
 
 %% @doc Is the given value a status type?
 -spec is_status(any()) -> boolean().
+is_status(L) when is_list(L) ->
+    is_status(hd(L));
 is_status({text, _}) ->
     true;
-is_status({column, _, _}) ->
+is_status({list, _, _}) ->
     true;
 is_status({table, _, _}) ->
     true;
@@ -62,10 +65,13 @@ is_status(_) ->
 text(IoList) ->
     {text, IoList}.
 
-%% @doc A column has an attribute and a list of values for that attribute.
--spec column(iolist(), [iolist()]) -> column().
-column(Title, Values) ->
-    {column, Title, Values}.
+-spec list([iolist()]) -> status_list().
+list(Values) ->
+    {list, Values}.
+
+-spec list(iolist(), [iolist()]) -> status_list().
+list(Title, Values) ->
+    {list, Title, Values}.
 
 %% @doc A table is constructed from a list of proplists. Each proplist
 %% represents a row in the table. The keys in the first row represent
@@ -76,6 +82,6 @@ table(Proplists) ->
    {table, Proplists}.
 
 %% A list of elements
--spec alert([column() | table() | text()]) -> alert().
+-spec alert([status_list() | table() | text()]) -> alert().
 alert(List) ->
     {alert, List}.
