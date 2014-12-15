@@ -7,5 +7,6 @@
 -type status_list() :: {list, iolist(), [iolist()]} | {list, [iolist()]}.
 -type table() :: {table, [{iolist(), iolist()}]}.
 -type alert() :: {alert, [status_list() | table() | text()]}.
--type elem() :: text() | status_list() | table() | alert().
+-type usage() :: usage.
+-type elem() :: text() | status_list() | table() | alert() | usage().
 -type status() :: [elem()].

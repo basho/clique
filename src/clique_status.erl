@@ -26,7 +26,8 @@
          list/2,
          table/1,
          alert/1,
-         is_status/1]).
+         is_status/1,
+         usage/0]).
 
 -include("clique_status_types.hrl").
 
@@ -79,9 +80,14 @@ list(Title, Values) ->
 %% number of tagged tuples but the keys are ignored.
 -spec table([[{atom() | string(), term()}]]) -> table().
 table(Proplists) ->
-   {table, Proplists}.
+    {table, Proplists}.
 
 %% A list of elements
 -spec alert([status_list() | table() | text()]) -> alert().
 alert(List) ->
     {alert, List}.
+
+%% @doc Using the usage construct, a clique run can indicate that
+%% clique should display status for the current level.
+usage() ->
+    usage.
