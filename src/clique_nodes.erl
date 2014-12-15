@@ -17,14 +17,14 @@
 %% under the License.
 %%
 %% -------------------------------------------------------------------
--module(riak_cli_nodes).
+-module(clique_nodes).
 
 -export([init/0,
          safe_rpc/4,
          nodes/0,
          register/1]).
 
--define(nodes_table, riak_cli_nodes).
+-define(nodes_table, clique_nodes).
 
 init() ->
     _ = ets:new(?nodes_table, [public, named_table]),

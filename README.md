@@ -1,9 +1,9 @@
 # Introduction
-Riak CLI is an opinionated framework for building command line interfaces in
+Clique is an opinionated framework for building command line interfaces in
 Erlang. It provides users with an interface that gives them enough power to
 build complex CLIs, but enough constraint to make them appear consistent.
 
-### Why Riak CLI ?
+### Why Clique ?
 When building a CLI for an Erlang application users frequently run into the following
 problems:
 
@@ -18,11 +18,11 @@ problems:
   * Configuration changes with runtime side effects are often difficult to
     implement.
 
-Riak CLI provides a standard way of implementing status, command, usage and
+Clique provides a standard way of implementing status, command, usage and
 configuration functionality while minimizing the amount of code needed to be
 written by users of the library.
 
-Riak CLI provides the application developer with the following capabilities:
+Clique provides the application developer with the following capabilities:
  * Implement callbacks that handle a given cli command such as `riak-admin handoff enable outbound`
  * Register usage points to show the correct usage in the command hierarchy when
    an incomplete command is run or the user issues the `--help` flag.
@@ -32,7 +32,7 @@ Riak CLI provides the application developer with the following capabilities:
    types: human-readable, csv, html, etc... (Note that currently only
    human-readable output is implemented)
 
-### Why Not Riak CLI ?
+### Why Not Clique ?
  * You aren't writing a CLI
  * You don't want or need to use cuttlefish for configuration
  * You only have a few command permutations and the dependency would be overkill
@@ -41,7 +41,7 @@ Riak CLI provides the application developer with the following capabilities:
  * You dislike your users
 
 # CLI usage
-Riak CLI provides a consistent and flexible interface to the end user of your
+Clique provides a consistent and flexible interface to the end user of your
 application. In the interest of clarity, a few examples will be given to
 illustrate common usage.
 
@@ -93,17 +93,17 @@ Options
 ```
 
 # Erlang API
-Riak CLI handles all parsing, validation, and type conversion of input data in a
-manner similar to getopt. Riak CLI also handles all formatting and output of
+Clique handles all parsing, validation, and type conversion of input data in a
+manner similar to getopt. Clique also handles all formatting and output of
 status. The user code registers specifications, usage documentation and
-callbacks in order to plug into Riak CLI. When a command is run, the code is
+callbacks in order to plug into Clique. When a command is run, the code is
 appropriately dispatched via the registry. Each registered callback returns a
-[status type](https://github.com/basho/riak_cli/blob/develop/src/riak_cli_status.erl)
-that allows riak_cli to format the output in a standardized way.
+[status type](https://github.com/basho/clique/blob/develop/src/clique_status.erl)
+that allows clique to format the output in a standardized way.
 
 ### register/1
 Register is a convenience function that gets called by an app with a list
-of modules that implement the ``riak_cli_handler`` behaviour. This behaviour
+of modules that implement the ``clique_handler`` behaviour. This behaviour
 implements a single callback: ``register_cli/0``. This callback is meant to wrap
 the other registration functions so that each individual command or logical set
 of commands can live in their own module and register themselves appropriately.
@@ -112,23 +112,23 @@ of commands can live in their own module and register themselves appropriately.
 %% Register the handler modules
 -module(riak_core_cli_registry).
 
-riak_cli:register([riak_core_cluster_status_handler]).
+clique:register([riak_core_cluster_status_handler]).
 ```
 
 ```erlang
 -module(riak_core_cluster_status_handler]).
 -export([register_cli/0]).
 
--behaviour(riak_cli_handler).
+-behaviour(clique_handler).
 
 register_cli() ->
-    riak_cli:register_config(...),
-    riak_cli:register_command(...).
+    clique:register_config(...),
+    clique:register_command(...).
 ```
 
 ### register_node_finder/1
 Configuration can be set and shown across nodes. In order to contact the
-appropriate nodes, the application needs to tell ``riak_cli`` how to determine that.
+appropriate nodes, the application needs to tell ``clique`` how to determine that.
 ``riak_core`` would do this in the following manner:
 
 ```erlang
@@ -136,11 +136,11 @@ F = fun() ->
         {ok, MyRing} = riak_core_ring_manager:get_my_ring(),
         riak_core_ring:all_members(MyRing)
     end,
-riak_cli:register_node_finder(F).
+clique:register_node_finder(F).
 ```
 
 Note that this function only needs to be called once per beam. The callback
-itself is stored in an ets table, and calling `riak_cli:register_node_finder/1`
+itself is stored in an ets table, and calling `clique:register_node_finder/1`
 again will overwrite it with a new function.
 
 ### register_config/2
@@ -168,7 +168,7 @@ on the local node (where the cli command was run) only.
 
 Key = ["transfer_limit"],
 Callback = fun set_transfer_limit/3,
-riak_cli:register_config(Key, Callback).
+clique:register_config(Key, Callback).
 ```
 
 ### register_command/4
@@ -177,7 +177,7 @@ related. These commands are relatively free-form, with the only restrictions
 being that arguments are key/value pairs and flags come after arguments. For
 example: `riak-admin transfer limit --node=dev2@127.0.0.1`. In this case the
 command is "riak-admin transfer limit" which gets passed a `--node` flag. There are no k/v
-arguments. These commands can be registered with riak_cli in the following
+arguments. These commands can be registered with clique in the following
 manner:
 
 ```erlang
@@ -188,7 +188,7 @@ Cmd = ["riak-admin", "handoff", "limit"],
 KeySpecs = [],
 FlagSpecs = [{node, [{shortname, "n"},
                      {longname, "node"},
-                     {typecast, fun riak_cli_typecast:to_node/1}]}].
+                     {typecast, fun clique_typecast:to_node/1}]}].
 
 %% The function which is registered as the callback for this command gets two
 %% arguments. One is a proplist of key/value pairs (if any, appropriately
@@ -196,25 +196,25 @@ FlagSpecs = [{node, [{shortname, "n"},
 %% appropriately typecast). The flags proplist contains the given "longname"
 %% converted to an atom as the proplist key.
 %%
-%% The expected return value of the callback function is `riak_cli_status:status()`.
+%% The expected return value of the callback function is `clique_status:status()`.
 %%
 %% This pattern matching works here because we know we only allow one flag in
 %% the flagspec, and the callback only ever fires with valid flags.
 Callback = fun([]=_Keys, [{node, Node}]=_Flags) ->
-               case riak_cli_nodes:safe_rpc(Node, somemod, somefun, []) of
+               case clique_nodes:safe_rpc(Node, somemod, somefun, []) of
                    {error, _} ->
-                       Text = riak_cli_status:text("Failed to Do Something"),
-                       [riak_cli_status:alert([Text])];
+                       Text = clique_status:text("Failed to Do Something"),
+                       [clique_status:alert([Text])];
                    {badrpc, _} ->
-                       Text = riak_cli_status:text("Failed to Do Something"),
-                       [riak_cli_status:alert([Text])];
+                       Text = clique_status:text("Failed to Do Something"),
+                       [clique_status:alert([Text])];
                    Val ->
                        Text = io_lib:format("Some Thing was done. Value = ~p~n", [Val]),
-                       [riak_cli_status:text(Text)]
+                       [clique_status:text(Text)]
                end
            end,
 
-riak_cli:register_command(Cmd, KeySpecs, FlagSpecs, Callback).
+clique:register_command(Cmd, KeySpecs, FlagSpecs, Callback).
 ```
 
 ### register_usage/2
@@ -246,8 +246,8 @@ handoff_limit_usage() ->
      "      just talking to the local node.\n\n"
      ].
 
-riak_cli:register_usage(["riak-admin", "handoff"], handoff_usage()),
-riak_cli:register_usage(["riak-admin", "handoff", "limit"], handoff_limit_usage()).
+clique:register_usage(["riak-admin", "handoff"], handoff_usage()),
+clique:register_usage(["riak-admin", "handoff", "limit"], handoff_limit_usage()).
 ```
 
 ### run/1
@@ -274,13 +274,13 @@ command(Cmd) ->
     %% This is the way arguments get passed in from a shell script using Nodetool.
     %% They are passed into an escript main/1 function in the same manner, but
     %% without the script name.
-    riak_cli:run(Cmd).
+    clique:run(Cmd).
 ```
 
 # Status API
-Riak CLI provides pretty printing support for status information. In order to do
+Clique provides pretty printing support for status information. In order to do
 this it requires status to be formatted in a specific manner when returned from
-a command. All custom commands should return a type of ``riak_cli_status:status()``.
+a command. All custom commands should return a type of ``clique_status:status()``.
 
 ## Types
 Types are abstract and should be generated by invoking the status API instead of assembled directly.
@@ -296,7 +296,7 @@ Only `alert` values contain nested status types; e.g., a table does not contain 
 
 See descriptions above for the arguments to each.
 
-* ``riak_cli_status:text/1`` - Takes an `iolist`, returns a `text` object.
-* `riak_cli_status:column/2` - Takes a title (`iolist`) and values (a list of `iolist`) intended to be displayed consecutively.
-* `riak_cli_status:table/1` - Takes a list of proplists, each representing a row in the table. The keys in the first row represent column headers; each following row (proplist) must contain the same number of tagged tuples in the same order, and the keys are ignored.
-* `riak_cli_status:alert/1` - Takes a list of status types representing an error condition.
+* ``clique_status:text/1`` - Takes an `iolist`, returns a `text` object.
+* `clique_status:column/2` - Takes a title (`iolist`) and values (a list of `iolist`) intended to be displayed consecutively.
+* `clique_status:table/1` - Takes a list of proplists, each representing a row in the table. The keys in the first row represent column headers; each following row (proplist) must contain the same number of tagged tuples in the same order, and the keys are ignored.
+* `clique_status:alert/1` - Takes a list of status types representing an error condition.

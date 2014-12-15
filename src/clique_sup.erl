@@ -17,19 +17,22 @@
 %% under the License.
 %%
 %% -------------------------------------------------------------------
--module(riak_cli_app).
+-module(clique_sup).
+-behaviour(supervisor).
 
--behaviour(application).
+%% beahvior functions
+-export([start_link/0,
+         init/1
+        ]).
 
-%% Application callbacks
--export([start/2, stop/1]).
+-define(CHILD(I,Type), {I,{I,start_link,[]},permanent,brutal_kill,Type,[I]}).
 
-%% ===================================================================
-%% Application callbacks
-%% ===================================================================
+start_link() ->
+    supervisor:start_link({local, ?MODULE}, ?MODULE, []).
 
-start(_StartType, _StartArgs) ->
-    riak_cli_sup:start_link().
-
-stop(_State) ->
-    ok.
+init([]) ->
+    %% We want to take down the node if the process gets killed. The process
+    %% does nothing besides create ets tables and register cuttlefish schemas.
+    %% If we lose the tables we lose cli access. Therefore
+    %% riak_core_console_manager should do no work outside of init/1.
+    {ok, {{one_for_one, 0, 10}, [?CHILD(clique_manager, worker)]}}.

@@ -17,7 +17,7 @@
 %% under the License.
 %%
 %% -------------------------------------------------------------------
--module(riak_cli_manager).
+-module(clique_manager).
 
 -behaviour(gen_server).
 
@@ -42,10 +42,10 @@ start_link() ->
 %% messages, it can only die if explicitly killed.
 %%
 init([]) ->
-    ok = riak_cli_command:init(),
-    ok = riak_cli_usage:init(),
-    ok = riak_cli_config:init(),
-    ok = riak_cli_nodes:init(),
+    ok = clique_command:init(),
+    ok = clique_usage:init(),
+    ok = clique_config:init(),
+    ok = clique_nodes:init(),
     {ok, #state{}}.
 
 handle_call(_Msg, _From, State) ->

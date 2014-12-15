@@ -17,7 +17,7 @@
 %% under the License.
 %%
 %% -------------------------------------------------------------------
--module(riak_cli_parser).
+-module(clique_parser).
 
 %% API
 -export([parse/1,

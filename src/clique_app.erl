@@ -17,6 +17,19 @@
 %% under the License.
 %%
 %% -------------------------------------------------------------------
--module(riak_cli_handler).
+-module(clique_app).
 
--callback register_cli() -> ok.
+-behaviour(application).
+
+%% Application callbacks
+-export([start/2, stop/1]).
+
+%% ===================================================================
+%% Application callbacks
+%% ===================================================================
+
+start(_StartType, _StartArgs) ->
+    clique_sup:start_link().
+
+stop(_State) ->
+    ok.

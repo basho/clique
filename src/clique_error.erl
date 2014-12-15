@@ -17,17 +17,17 @@
 %% under the License.
 %%
 %% -------------------------------------------------------------------
--module(riak_cli_error).
+-module(clique_error).
 
 %% API
 -export([format/1]).
 
--type status() :: riak_cli_status:status().
+-type status() :: clique_status:status().
 -type err() :: {error, term()}.
 
 -spec format(err()) -> status().
 format({error, {no_matching_spec, Cmd}}) ->
-    case riak_cli_usage:find(Cmd) of
+    case clique_usage:find(Cmd) of
         {error, _} ->
             status("Invalid Command~n");
         Usage ->
@@ -70,4 +70,4 @@ format({error, bad_node}) ->
 
 -spec status(string()) -> status().
 status(Str) ->
-    [riak_cli_status:alert([riak_cli_status:text(Str)])].
+    [clique_status:alert([clique_status:text(Str)])].

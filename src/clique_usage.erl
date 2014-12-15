@@ -17,9 +17,9 @@
 %% under the License.
 %%
 %% -------------------------------------------------------------------
--module(riak_cli_usage).
+-module(clique_usage).
 
--define(usage_table, riak_cli_usage).
+-define(usage_table, clique_usage).
 
 -type err() :: {error, term()}.
 

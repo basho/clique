@@ -18,13 +18,13 @@
 %%
 %% -------------------------------------------------------------------
 
--module(riak_cli_table).
+-module(clique_table).
 
 %% API
 -export([print/2, print/3,
          create_table/2, autosize_create_table/2]).
 
--include("riak_cli_status_types.hrl").
+-include("clique_status_types.hrl").
 
 -define(MAX_LINE_LEN, 100).
 
