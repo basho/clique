@@ -66,7 +66,7 @@ print({error, _}=E) ->
     Alert = clique_error:format(E),
     print(Alert);
 print(Status) ->
-    Output = clique_writer:write(Status),
+    Output = clique_human_writer:write(Status),
     io:format("~ts", [Output]),
     ok.
 

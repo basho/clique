@@ -17,11 +17,11 @@
 %% under the License.
 %%
 %% -------------------------------------------------------------------
--module(clique_writer).
+-module(clique_human_writer).
 
 %% @doc This module provides callback functions to the status parsing code in
-%% clique_status:parse/3. It specifically formats the output for the console
-%% and handles an opaque context passed back during parsing.
+%% clique_status:parse/3. It specifically formats the output for a human at the
+%% console and handles an opaque context passed back during parsing.
 
 %% API
 -export([write/1]).
