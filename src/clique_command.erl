@@ -17,9 +17,9 @@
 %% under the License.
 %%
 %% -------------------------------------------------------------------
--module(riak_cli_command).
+-module(clique_command).
 
--define(cmd_table, riak_cli_commands).
+-define(cmd_table, clique_commands).
 
 
 %% API
@@ -30,7 +30,7 @@
 
 -type err() :: {error, term()}.
 -type proplist() :: [{atom(), term()}].
--type status() :: riak_cli_status:status().
+-type status() :: clique_status:status().
 
 init() ->
     _ = ets:new(?cmd_table, [public, named_table]),
@@ -61,7 +61,7 @@ match(Cmd0) ->
 -spec split_command([list()]) -> {list(), list()}.
 split_command(Cmd0) ->
     lists:splitwith(fun(Str) ->
-                        riak_cli_parser:is_not_kv_arg(Str) andalso
-                        riak_cli_parser:is_not_flag(Str)
+                        clique_parser:is_not_kv_arg(Str) andalso
+                        clique_parser:is_not_flag(Str)
                     end, Cmd0).
 

@@ -17,7 +17,7 @@
 %% under the License.
 %%
 %% -------------------------------------------------------------------
--module(riak_cli).
+-module(clique).
 
 %% API
 -export([register/1,
@@ -42,51 +42,51 @@ register(Modules) ->
 %% cluster member nodes.
 -spec register_node_finder(fun()) -> true.
 register_node_finder(Fun) ->
-    riak_cli_nodes:register(Fun).
+    clique_nodes:register(Fun).
 
 %% @doc Register configuration callbacks for a given config key
 -spec register_config([string()], fun()) -> true.
 register_config(Key, Callback) ->
-    riak_cli_config:register(Key, Callback).
+    clique_config:register(Key, Callback).
 
 %% @doc Register a cli command (i.e.: "riak-admin handoff status")
 -spec register_command([string()], list(), list(), fun()) -> true.
 register_command(Cmd, Keys, Flags, Fun) ->
-    riak_cli_command:register(Cmd, Keys, Flags, Fun).
+    clique_command:register(Cmd, Keys, Flags, Fun).
 
 %% @doc Register usage for a given command sequence. Lookups are by longest
 %% match.
 -spec register_usage([string()], iolist()) -> true.
 register_usage(Cmd, Usage) ->
-    riak_cli_usage:register(Cmd, Usage).
+    clique_usage:register(Cmd, Usage).
 
 %% @doc Take a list of status types and generate console output
--spec print(err() | riak_cli_status:status()) -> ok.
+-spec print(err() | clique_status:status()) -> ok.
 print({error, _}=E) ->
-    Alert = riak_cli_error:format(E),
+    Alert = clique_error:format(E),
     print(Alert);
 print(Status) ->
-    Output = riak_cli_writer:write(Status),
+    Output = clique_writer:write(Status),
     io:format("~ts", [Output]),
     ok.
 
 %% @doc Run a config operation or command
 -spec run([string()]) -> ok | {error, term()}.
 run([_Script, "set" | Args]) ->
-    print(riak_cli_config:set(Args));
+    print(clique_config:set(Args));
 run([_Script, "show" | Args]) ->
-    print(riak_cli_config:show(Args));
+    print(clique_config:show(Args));
 run([_Script, "describe" | Args]) ->
-    print(riak_cli_config:describe(Args));
+    print(clique_config:describe(Args));
 run(Cmd0) ->
     case is_help(Cmd0) of
         {ok, Cmd} ->
-            riak_cli_usage:print(Cmd);
+            clique_usage:print(Cmd);
         _ ->
-            M0 = riak_cli_command:match(Cmd0),
-            M1 = riak_cli_parser:parse(M0),
-            M2 = riak_cli_parser:validate(M1),
-            print(riak_cli_command:run(M2))
+            M0 = clique_command:match(Cmd0),
+            M1 = clique_parser:parse(M0),
+            M2 = clique_parser:validate(M1),
+            print(clique_command:run(M2))
     end.
 
 %% @doc Help flags always comes at the end of the command

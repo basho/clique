@@ -17,23 +17,23 @@
 %% under the License.
 %%
 %% -------------------------------------------------------------------
--module(riak_cli_writer).
+-module(clique_writer).
 
 %% @doc This module provides callback functions to the status parsing code in
-%% riak_cli_status:parse/3. It specifically formats the output for the console
+%% clique_status:parse/3. It specifically formats the output for the console
 %% and handles an opaque context passed back during parsing.
 
 %% API
 -export([write/1]).
 
--include("riak_cli_status_types.hrl").
+-include("clique_status_types.hrl").
 
 -record(context, {alert_set=false :: boolean(),
                   output="" :: iolist()}).
 
 -spec write(status()) -> iolist().
 write(Status) ->
-    Ctx = riak_cli_status:parse(Status, fun write_status/2, #context{}),
+    Ctx = clique_status:parse(Status, fun write_status/2, #context{}),
     Ctx#context.output.
 
 %% @doc Write status information in console format.
@@ -62,7 +62,7 @@ write_table([]) ->
 write_table(Rows0) ->
     Schema = [Name || {Name, _Val} <- hd(Rows0)],
     Rows = [[Val || {_Name, Val} <- Row] || Row <- Rows0],
-    Table = riak_cli_table:autosize_create_table(Schema, Rows),
+    Table = clique_table:autosize_create_table(Schema, Rows),
     io_lib:format("~ts~n", [Table]).
 
 %% @doc Write a list horizontally

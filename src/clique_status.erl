@@ -17,7 +17,7 @@
 %% under the License.
 %%
 %% -------------------------------------------------------------------
--module(riak_cli_status).
+-module(clique_status).
 
 %% API
 -export([parse/3,
@@ -28,7 +28,7 @@
          alert/1,
          is_status/1]).
 
--include("riak_cli_status_types.hrl").
+-include("clique_status_types.hrl").
 
 -export_type([status/0]).
 

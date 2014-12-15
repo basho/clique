@@ -1,4 +1,4 @@
-{application, riak_cli,
+{application, clique,
  [
   {description, "A CLI library for erlang"},
   {vsn, git},
@@ -8,6 +8,6 @@
                   kernel,
                   stdlib
                  ]},
-  {mod, {riak_cli_app, []}},
+  {mod, {clique_app, []}},
   {env, []}
  ]}.

@@ -17,7 +17,7 @@
 %% under the License.
 %%
 %% -------------------------------------------------------------------
--module(riak_cli_config).
+-module(clique_config).
 
 %% API
 -export([init/0,
@@ -31,11 +31,11 @@
          get_local_env_vals/1,
          set_local_app_config/1]).
 
--define(config_table, riak_cli_config).
--define(schema_table, riak_cli_schema).
+-define(config_table, clique_config).
+-define(schema_table, clique_schema).
 
 -type err() :: {error, term()}.
--type status() :: riak_cli_status:status().
+-type status() :: clique_status:status().
 -type proplist() :: [{atom(), term()}].
 -type flags() :: [{atom() | char(), term()}].
 
@@ -55,7 +55,7 @@ init() ->
 %% TODO: This doesn't work for keys with translations.
 %% This should almost certainly show the riak.conf value. For now it only works
 %% for 1:1 mappings because of we don't save the user value AFAIK.
--spec show([string()]) -> riak_cli_status:status() | err().
+-spec show([string()]) -> clique_status:status() | err().
 show(KeysAndFlags) ->
     case get_valid_mappings(KeysAndFlags) of
         {error, _}=E ->
@@ -64,7 +64,7 @@ show(KeysAndFlags) ->
             {error, config_no_args};
         {Keys, Mappings, Flags0}->
             AppKeyPairs = get_env_keys(Mappings),
-            case riak_cli_parser:validate_flags(config_flags(), Flags0) of
+            case clique_parser:validate_flags(config_flags(), Flags0) of
                 {error, _}=E ->
                     E;
                 Flags ->
@@ -72,7 +72,7 @@ show(KeysAndFlags) ->
             end
     end.
 
--spec describe([string()]) -> riak_cli_status:status() | err().
+-spec describe([string()]) -> clique_status:status() | err().
 describe(KeysAndFlags) ->
     case get_valid_mappings(KeysAndFlags) of
         {error, _}=E ->
@@ -84,13 +84,13 @@ describe(KeysAndFlags) ->
             [begin
                  Doc = cuttlefish_mapping:doc(M),
                  Name = cuttlefish_variable:format(cuttlefish_mapping:variable(M)),
-                 riak_cli_status:text(Name ++ ":\n  " ++ string:join(Doc,"\n  ") ++ "\n")
+                 clique_status:text(Name ++ ":\n  " ++ string:join(Doc,"\n  ") ++ "\n")
              end || M <- Mappings]
     end.
 
 -spec set([string()]) -> status() | err().
 set(ArgsAndFlags) ->
-    M1 = riak_cli_parser:parse(ArgsAndFlags),
+    M1 = clique_parser:parse(ArgsAndFlags),
     M2 = get_config(M1),
     M3 = set_config(M2),
     case run_callback(M3) of
@@ -116,7 +116,7 @@ get_env_status(_Keys, _AppKeyPairs, _Flags) ->
 -spec get_local_env_status([string()], [{atom(), atom()}]) -> status().
 get_local_env_status(Keys, AppKeyPairs) ->
     Row = get_local_env_vals(AppKeyPairs),
-    [riak_cli_status:table([lists:zip(["Node" | Keys], Row)])].
+    [clique_status:table([lists:zip(["Node" | Keys], Row)])].
 
 -spec get_local_env_vals([{atom(), atom()}]) -> list().
 get_local_env_vals(AppKeyPairs) ->
@@ -128,7 +128,7 @@ get_local_env_vals(AppKeyPairs) ->
 
 -spec get_remote_env_status([string()], [{atom(), atom()}], node()) -> status().
 get_remote_env_status(Keys, AppKeyPairs, Node) ->
-    case riak_cli_nodes:safe_rpc(Node, ?MODULE, get_local_env_status, [Keys, AppKeyPairs]) of
+    case clique_nodes:safe_rpc(Node, ?MODULE, get_local_env_status, [Keys, AppKeyPairs]) of
         {badrpc, rpc_process_down} ->
             io:format("Error: Node ~p Down~n", [Node]),
             [];
@@ -138,7 +138,7 @@ get_remote_env_status(Keys, AppKeyPairs, Node) ->
 
 -spec get_remote_env_status([string()], [{atom(), atom()}]) -> status().
 get_remote_env_status(Keys0, AppKeyPairs) ->
-    Nodes = riak_cli_nodes:nodes(),
+    Nodes = clique_nodes:nodes(),
     {Rows0, Down} = rpc:multicall(Nodes,
                                   ?MODULE,
                                   get_local_env_vals,
@@ -146,11 +146,11 @@ get_remote_env_status(Keys0, AppKeyPairs) ->
                                   60000),
     Keys = ["Node" | Keys0],
     Rows = [lists:zip(Keys, Row) || Row <- Rows0],
-    Table = riak_cli_status:table(Rows),
+    Table = clique_status:table(Rows),
     case (Down == []) of
         false ->
             Text = io_lib:format("Failed to get config for: ~p~n", [Down]),
-            Alert = riak_cli_status:alert([riak_cli_status:text(Text)]),
+            Alert = clique_status:alert([clique_status:text(Text)]),
             [Table, Alert];
         true ->
             [Table]
@@ -186,7 +186,7 @@ get_config({Args, Flags0}) ->
         {error, _, Msg} ->
             {error, {invalid_config, Msg}};
         AppConfig ->
-            case riak_cli_parser:validate_flags(config_flags(), Flags0) of
+            case clique_parser:validate_flags(config_flags(), Flags0) of
                 {error, _}=E ->
                     E;
                 Flags ->
@@ -227,7 +227,7 @@ set_local_app_config(AppConfig) ->
 -spec set_remote_app_config(proplist(), node()) -> ok.
 set_remote_app_config(AppConfig, Node) ->
     Fun = set_local_app_config,
-    case riak_cli_nodes:safe_rpc(Node, ?MODULE, Fun, [AppConfig]) of
+    case clique_nodes:safe_rpc(Node, ?MODULE, Fun, [AppConfig]) of
         {badrpc, _} ->
             ok;
         ok ->
@@ -237,7 +237,7 @@ set_remote_app_config(AppConfig, Node) ->
 -spec set_remote_app_config(proplist()) -> ok.
 set_remote_app_config(AppConfig) ->
     io:format("Setting config across the cluster~n", []),
-    {_, Down} = rpc:multicall(riak_cli_nodes:nodes(),
+    {_, Down} = rpc:multicall(clique_nodes:nodes(),
                               ?MODULE,
                               set_local_app_config,
                               [AppConfig],
@@ -249,7 +249,7 @@ set_remote_app_config(AppConfig) ->
 config_flags() ->
     [{node, [{shortname, "n"},
              {longname, "node"},
-             {typecast, fun riak_cli_typecast:to_node/1},
+             {typecast, fun clique_typecast:to_node/1},
              {description,
                  "The node to apply the operation on"}]},
 
@@ -261,7 +261,7 @@ config_flags() ->
 
 -spec get_valid_mappings([string()]) -> err() | {[string()], list(tuple()), flags()}.
 get_valid_mappings(KeysAndFlags) ->
-    {Keys0, Flags0} = lists:splitwith(fun riak_cli_parser:is_not_flag/1, KeysAndFlags),
+    {Keys0, Flags0} = lists:splitwith(fun clique_parser:is_not_flag/1, KeysAndFlags),
     Keys = [cuttlefish_variable:tokenize(K) || K <- Keys0],
     [{schema, Schema}] = ets:lookup(?schema_table, schema),
     {_Translations, Mappings0, _Validators} = Schema,
@@ -271,7 +271,7 @@ get_valid_mappings(KeysAndFlags) ->
             Invalid = invalid_keys(Keys, Mappings),
             {error, {invalid_config_keys, Invalid}};
         true ->
-            case riak_cli_parser:parse_flags(Flags0) of
+            case clique_parser:parse_flags(Flags0) of
                 {error, _}=E ->
                     E;
                 Flags ->
