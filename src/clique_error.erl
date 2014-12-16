@@ -65,10 +65,8 @@ format({error, config_no_args}) ->
     status("Config Operations require one or more arguments");
 format({error, {invalid_config, {error, [_H|_T]=Msgs}}}) ->
     %% Cuttlefish deeply nested errors
-    status(lists:flatten(
-             lists:foldl(fun({error, Msg}, Acc) ->
-                                 Acc ++ io_lib:format("~ts~n", [Msg]) end,
-                         [], Msgs)));
+    status(string:join(lists:map(fun({error, Msg}) -> Msg end,
+                                 Msgs), "\n"));
 format({error, {invalid_config, Msg}}) ->
     status(io_lib:format("Invalid Configuration: ~p~n", [Msg]));
 format({error, bad_node}) ->
