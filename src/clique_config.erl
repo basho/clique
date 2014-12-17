@@ -127,10 +127,10 @@ get_local_env_vals(AppKeyPairs, CuttlefishFlags) ->
     Vals = [begin
                 {ok, Val} = application:get_env(App, Key),
                 case {CFlagSpec, Val} of
-                    {{flag, FalseVal, _}, false} ->
-                        FalseVal;
-                    {{flag, _, TrueVal}, true} ->
+                    {{flag, TrueVal, _}, true} ->
                         TrueVal;
+                    {{flag, _, FalseVal}, false} ->
+                        FalseVal;
                     _ ->
                         Val
                 end
@@ -327,9 +327,9 @@ get_cuttlefish_flags(Mappings) ->
     NormalizeFlag = fun(M) ->
                             case cuttlefish_mapping:datatype(M) of
                                 [flag] ->
-                                    {flag, off, on};
-                                [{flag, FalseVal, TrueVal}] ->
-                                    {flag, FalseVal, TrueVal};
+                                    {flag, on, off};
+                                [{flag, TrueVal, FalseVal}] ->
+                                    {flag, TrueVal, FalseVal};
                                 _ ->
                                     undefined
                             end
