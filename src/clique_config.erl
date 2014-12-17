@@ -27,8 +27,8 @@
          describe/1]).
 
 %% Callbacks for rpc calls
--export([get_local_env_status/2,
-         get_local_env_vals/1,
+-export([get_local_env_status/3,
+         get_local_env_vals/2,
          set_local_app_config/1]).
 
 -define(config_table, clique_config).
@@ -38,6 +38,9 @@
 -type status() :: clique_status:status().
 -type proplist() :: [{atom(), term()}].
 -type flags() :: [{atom() | char(), term()}].
+
+-type cuttlefish_flag_spec() :: {flag, atom(), atom()}.
+-type cuttlefish_flag_list() :: [undefined | cuttlefish_flag_spec()].
 
 %% @doc Register configuration callbacks for a given config key
 -spec register([string()], fun()) -> true.
@@ -64,11 +67,12 @@ show(KeysAndFlags) ->
             {error, config_no_args};
         {Keys, Mappings, Flags0}->
             AppKeyPairs = get_env_keys(Mappings),
+            CuttlefishFlags = get_cuttlefish_flags(Mappings),
             case clique_parser:validate_flags(config_flags(), Flags0) of
                 {error, _}=E ->
                     E;
                 Flags ->
-                    get_env_status(Keys, AppKeyPairs, Flags)
+                    get_env_status(Keys, AppKeyPairs, CuttlefishFlags, Flags)
             end
     end.
 
@@ -100,35 +104,44 @@ set(ArgsAndFlags) ->
             []
     end.
 
--spec get_env_status([string()], [{atom(), atom()}], flags()) -> status() |
+-spec get_env_status([string()], [{atom(), atom()}], cuttlefish_flag_list(), flags()) -> status() |
                                                                  err().
-get_env_status(Keys, AppKeyPairs, []) ->
-    get_local_env_status(Keys, AppKeyPairs);
-get_env_status(Keys, AppKeyPairs, Flags) when length(Flags) =:= 1 ->
+get_env_status(Keys, AppKeyPairs, CuttlefishFlags, []) ->
+    get_local_env_status(Keys, AppKeyPairs, CuttlefishFlags);
+get_env_status(Keys, AppKeyPairs, CuttlefishFlags, Flags) when length(Flags) =:= 1 ->
     [{Key, Val}] = Flags,
     case Key of
-        node -> get_remote_env_status(Keys, AppKeyPairs, Val);
-        all -> get_remote_env_status(Keys, AppKeyPairs)
+        node -> get_remote_env_status(Keys, AppKeyPairs, CuttlefishFlags, Val);
+        all -> get_remote_env_status(Keys, AppKeyPairs, CuttlefishFlags)
     end;
-get_env_status(_Keys, _AppKeyPairs, _Flags) ->
+get_env_status(_Keys, _AppKeyPairs, _CuttlefishFlags, _Flags) ->
     app_config_flags_error().
 
--spec get_local_env_status([string()], [{atom(), atom()}]) -> status().
-get_local_env_status(Keys, AppKeyPairs) ->
-    Row = get_local_env_vals(AppKeyPairs),
+-spec get_local_env_status([string()], [{atom(), atom()}], cuttlefish_flag_list()) -> status().
+get_local_env_status(Keys, AppKeyPairs, CuttlefishFlags) ->
+    Row = get_local_env_vals(AppKeyPairs, CuttlefishFlags),
     [clique_status:table([lists:zip(["Node" | Keys], Row)])].
 
--spec get_local_env_vals([{atom(), atom()}]) -> list().
-get_local_env_vals(AppKeyPairs) ->
+-spec get_local_env_vals([{atom(), atom()}], cuttlefish_flag_list()) -> list().
+get_local_env_vals(AppKeyPairs, CuttlefishFlags) ->
     Vals = [begin
                 {ok, Val} = application:get_env(App, Key),
-                Val
-            end || {App, Key} <- AppKeyPairs],
+                case {CFlagSpec, Val} of
+                    {{flag, FalseVal, _}, false} ->
+                        FalseVal;
+                    {{flag, _, TrueVal}, true} ->
+                        TrueVal;
+                    _ ->
+                        Val
+                end
+            end || {{App, Key}, CFlagSpec} <- lists:zip(AppKeyPairs, CuttlefishFlags)],
     [node() | Vals].
 
--spec get_remote_env_status([string()], [{atom(), atom()}], node()) -> status().
-get_remote_env_status(Keys, AppKeyPairs, Node) ->
-    case clique_nodes:safe_rpc(Node, ?MODULE, get_local_env_status, [Keys, AppKeyPairs]) of
+-spec get_remote_env_status([string()], [{atom(), atom()}], cuttlefish_flag_list(), node()) ->
+    status().
+get_remote_env_status(Keys, AppKeyPairs, CuttlefishFlags, Node) ->
+    case clique_nodes:safe_rpc(Node, ?MODULE, get_local_env_status,
+                               [Keys, AppKeyPairs, CuttlefishFlags]) of
         {badrpc, rpc_process_down} ->
             io:format("Error: Node ~p Down~n", [Node]),
             [];
@@ -136,13 +149,13 @@ get_remote_env_status(Keys, AppKeyPairs, Node) ->
             Status
     end.
 
--spec get_remote_env_status([string()], [{atom(), atom()}]) -> status().
-get_remote_env_status(Keys0, AppKeyPairs) ->
+-spec get_remote_env_status([string()], [{atom(), atom()}], cuttlefish_flag_list()) -> status().
+get_remote_env_status(Keys0, AppKeyPairs, CuttlefishFlags) ->
     Nodes = clique_nodes:nodes(),
     {Rows0, Down} = rpc:multicall(Nodes,
                                   ?MODULE,
                                   get_local_env_vals,
-                                  [AppKeyPairs],
+                                  [AppKeyPairs, CuttlefishFlags],
                                   60000),
     Keys = ["Node" | Keys0],
     Rows = [lists:zip(Keys, Row) || Row <- Rows0],
@@ -300,6 +313,28 @@ get_env_keys(Mappings) ->
     EnvStrs = [cuttlefish_mapping:mapping(M) || M <- Mappings],
     AppAndKeys = [string:tokens(S, ".") || S <- EnvStrs],
     [{list_to_atom(App), list_to_atom(Key)} || [App, Key] <-  AppAndKeys].
+
+%% This is part of a minor hack we've added for correctly displaying config
+%% values of type 'flag'. We pull out any relevant info from the mappings
+%% about flag values, and then use it later on to convert true/false values
+%% into e.g. on/off for display to the user.
+%%
+%% Ideally cuttlefish should provide some way of converting values back to
+%% their user-friendly versions (like what you would see in the config file
+%% or pass to riak-admin set) but that may require some more in-depth work...
+-spec get_cuttlefish_flags([cuttlefish_mapping:mapping()]) -> cuttlefish_flag_list().
+get_cuttlefish_flags(Mappings) ->
+    NormalizeFlag = fun(M) ->
+                            case cuttlefish_mapping:datatype(M) of
+                                [flag] ->
+                                    {flag, off, on};
+                                [{flag, FalseVal, TrueVal}] ->
+                                    {flag, FalseVal, TrueVal};
+                                _ ->
+                                    undefined
+                            end
+                    end,
+    lists:map(NormalizeFlag, Mappings).
 
 -spec app_config_flags_error() -> err().
 app_config_flags_error() ->
