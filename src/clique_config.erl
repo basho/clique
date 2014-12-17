@@ -259,7 +259,8 @@ config_flags() ->
                 "Apply the operation to all nodes in the cluster"}]}].
 
 
--spec get_valid_mappings([string()]) -> err() | {[string()], list(tuple()), flags()}.
+-spec get_valid_mappings([string()]) -> err() |
+                                        {[string()], [cuttlefish_mapping:mapping()], flags()}.
 get_valid_mappings(KeysAndFlags) ->
     {Keys0, Flags0} = lists:splitwith(fun clique_parser:is_not_flag/1, KeysAndFlags),
     Keys = [cuttlefish_variable:tokenize(K) || K <- Keys0],
@@ -294,7 +295,7 @@ invalid_keys(Keys, Mappings) ->
                            end, Keys),
    [cuttlefish_variable:format(I)++" " || I <- Invalid].
 
--spec get_env_keys(list(tuple())) -> [{atom(), atom()}].
+-spec get_env_keys([cuttlefish_mapping:mapping()]) -> [{atom(), atom()}].
 get_env_keys(Mappings) ->
     EnvStrs = [cuttlefish_mapping:mapping(M) || M <- Mappings],
     AppAndKeys = [string:tokens(S, ".") || S <- EnvStrs],
