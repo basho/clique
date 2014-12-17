@@ -26,7 +26,7 @@
          register_config/2,
          register_usage/2,
          run/1,
-         print/1]).
+         print/2]).
 
 -type err() :: {error, term()}.
 
@@ -61,23 +61,25 @@ register_usage(Cmd, Usage) ->
     clique_usage:register(Cmd, Usage).
 
 %% @doc Take a list of status types and generate console output
--spec print(err() | clique_status:status()) -> ok.
-print({error, _}=E) ->
+-spec print(err() | clique_status:status(), [string()]) -> ok.
+print(usage, Cmd) ->
+    clique_usage:print(Cmd);
+print({error, _}=E, Cmd) ->
     Alert = clique_error:format(E),
-    print(Alert);
-print(Status) ->
+    print(Alert, Cmd);
+print(Status, _Cmd) ->
     Output = clique_human_writer:write(Status),
     io:format("~ts", [Output]),
     ok.
 
 %% @doc Run a config operation or command
 -spec run([string()]) -> ok | {error, term()}.
-run([_Script, "set" | Args]) ->
-    print(clique_config:set(Args));
-run([_Script, "show" | Args]) ->
-    print(clique_config:show(Args));
-run([_Script, "describe" | Args]) ->
-    print(clique_config:describe(Args));
+run([_Script, "set" | Args] = Cmd) ->
+    print(clique_config:set(Args), Cmd);
+run([_Script, "show" | Args] = Cmd) ->
+    print(clique_config:show(Args), Cmd);
+run([_Script, "describe" | Args] = Cmd) ->
+    print(clique_config:describe(Args), Cmd);
 run(Cmd0) ->
     case is_help(Cmd0) of
         {ok, Cmd} ->
@@ -86,7 +88,7 @@ run(Cmd0) ->
             M0 = clique_command:match(Cmd0),
             M1 = clique_parser:parse(M0),
             M2 = clique_parser:validate(M1),
-            print(clique_command:run(M2))
+            print(clique_command:run(M2), Cmd0)
     end.
 
 %% @doc Help flags always comes at the end of the command
