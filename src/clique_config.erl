@@ -56,8 +56,13 @@ init() ->
     ok.
 
 %% TODO: This doesn't work for keys with translations.
-%% This should almost certainly show the riak.conf value. For now it only works
-%% for 1:1 mappings because of we don't save the user value AFAIK.
+%% This should almost certainly show the riak.conf value.
+%% But, there's not currently any way to reverse cuttlefish
+%% translations to get from the application env value back
+%% to the value you'd see in the config file or use with
+%% the "set" command. We do support flags because those are
+%% reversible, but to fully support all possible values we'll
+%% have to add reverse translation support to cuttlefish.
 -spec show([string()]) -> clique_status:status() | err().
 show(KeysAndFlags) ->
     case get_valid_mappings(KeysAndFlags) of
