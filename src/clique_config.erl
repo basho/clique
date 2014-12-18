@@ -24,6 +24,7 @@
          register/2,
          show/1,
          set/1,
+         whitelist/1,
          describe/1]).
 
 %% Callbacks for rpc calls
@@ -33,6 +34,7 @@
 
 -define(config_table, clique_config).
 -define(schema_table, clique_schema).
+-define(whitelist_table, clique_whitelist).
 
 -type err() :: {error, term()}.
 -type status() :: clique_status:status().
@@ -51,6 +53,7 @@ register(Key, Callback) ->
 init() ->
     _ = ets:new(?config_table, [public, named_table]),
     _ = ets:new(?schema_table, [public, named_table]),
+    _ = ets:new(?whitelist_table, [public, named_table]),
     SchemaFiles = filelib:wildcard(code:lib_dir() ++ "/*.schema"),
     Schema = cuttlefish_schema:files(SchemaFiles),
     true = ets:insert(?schema_table, {schema, Schema}),
@@ -108,6 +111,32 @@ set(ArgsAndFlags) ->
             E;
         _ ->
             []
+    end.
+
+%% @doc Whitelist settable cuttlefish variables. By default all variables are not settable.
+-spec whitelist([string()]) -> ok | {error, {invalid_config_keys, [string()]}}.
+whitelist(Keys) ->
+    case get_valid_mappings(Keys) of
+        {error, _}=E ->
+            E;
+        {_, _} ->
+            _ = [ets:insert(?whitelist_table, {Key}) || Key <- Keys],
+            ok
+    end.
+
+-spec keys_in_whitelist([string()]) -> true | {error, {config_not_settable, [string()]}}.
+keys_in_whitelist(Keys) ->
+    Invalid =lists:foldl(fun(K, Acc) ->
+                             case ets:lookup(?whitelist_table, K) of
+                                 [{_K}] ->
+                                     Acc;
+                                 [] ->
+                                     [K | Acc]
+                             end
+                         end, [], Keys),
+    case Invalid of
+        [] -> true;
+        _ -> {error, {config_not_settable, Invalid}}
     end.
 
 -spec get_env_status([envkey()], cuttlefish_flag_list(), flags()) -> status() |
@@ -217,10 +246,16 @@ get_config({Args, Flags0}) ->
 set_config({error, _}=E) ->
     E;
 set_config({AppConfig, Args, Flags}) ->
-    case set_app_config(AppConfig, Flags) of
-        ok ->
-            {Args, Flags};
-        E ->
+    Keys = [cuttlefish_variable:format(K) || {K, _}  <- Args],
+    case keys_in_whitelist(Keys) of
+        true ->
+            case set_app_config(AppConfig, Flags) of
+                ok ->
+                    {Args, Flags};
+                E ->
+                    E
+            end;
+        {error, _}=E ->
             E
     end.
 

@@ -24,6 +24,7 @@
          register_node_finder/1,
          register_command/4,
          register_config/2,
+         register_config_whitelist/1,
          register_usage/2,
          run/1,
          print/2]).
@@ -48,6 +49,13 @@ register_node_finder(Fun) ->
 -spec register_config([string()], fun()) -> true.
 register_config(Key, Callback) ->
     clique_config:register(Key, Callback).
+
+%% @doc Register a list of configuration variables that are settable.
+%% Clique disallows setting of all config variables by default. They must be in
+%% whitelist to be settable.
+-spec register_config_whitelist([string()]) -> ok | {error, {invalid_config_keys, [string()]}}.
+register_config_whitelist(SettableKeys) ->
+    clique_config:whitelist(SettableKeys).
 
 %% @doc Register a cli command (i.e.: "riak-admin handoff status")
 -spec register_command([string()], list(), list(), fun()) -> true.
