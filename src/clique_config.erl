@@ -149,8 +149,7 @@ get_remote_env_status(EnvKeys, CuttlefishFlags, Node) ->
     case clique_nodes:safe_rpc(Node, ?MODULE, get_local_env_status,
                                [EnvKeys, CuttlefishFlags]) of
         {badrpc, rpc_process_down} ->
-            io:format("Error: Node ~p Down~n", [Node]),
-            [];
+            {error, {rpc_process_down, Node}};
         {badrpc, nodedown} ->
             {error, {nodedown, Node}};
         Status ->
@@ -247,8 +246,10 @@ set_local_app_config(AppConfig) ->
 set_remote_app_config(AppConfig, Node) ->
     Fun = set_local_app_config,
     case clique_nodes:safe_rpc(Node, ?MODULE, Fun, [AppConfig]) of
-        {badrpc, _} ->
-            ok;
+        {badrpc, rpc_process_down} ->
+            {error, {rpc_process_down, Node}};
+        {badrpc, nodedown} ->
+            {error, {nodedown, Node}};
         ok ->
             ok
     end.
