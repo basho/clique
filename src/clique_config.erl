@@ -150,6 +150,8 @@ get_remote_env_status(Keys, AppKeyPairs, CuttlefishFlags, Node) ->
         {badrpc, rpc_process_down} ->
             io:format("Error: Node ~p Down~n", [Node]),
             [];
+        {badrpc, nodedown} ->
+            {error, {nodedown, Node}};
         Status ->
             Status
     end.

@@ -69,6 +69,8 @@ format({error, {invalid_config, {error, [_H|_T]=Msgs}}}) ->
                                  Msgs), "\n"));
 format({error, {invalid_config, Msg}}) ->
     status(io_lib:format("Invalid Configuration: ~p~n", [Msg]));
+format({error, {nodedown, Node}}) ->
+    status(io_lib:format("Target node is down: ~p~n", [Node]));
 format({error, bad_node}) ->
     status("Invalid node name").
 
