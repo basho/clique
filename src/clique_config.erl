@@ -27,7 +27,7 @@
          describe/1]).
 
 %% Callbacks for rpc calls
--export([get_local_env_status/3,
+-export([get_local_env_status/2,
          get_local_env_vals/2,
          set_local_app_config/1]).
 
@@ -39,6 +39,7 @@
 -type proplist() :: [{atom(), term()}].
 -type flags() :: [{atom() | char(), term()}].
 
+-type envkey() :: {string(), {atom(), atom()}}.
 -type cuttlefish_flag_spec() :: {flag, atom(), atom()}.
 -type cuttlefish_flag_list() :: [undefined | cuttlefish_flag_spec()].
 
@@ -68,16 +69,16 @@ show(KeysAndFlags) ->
     case get_valid_mappings(KeysAndFlags) of
         {error, _}=E ->
             E;
-        {_Keys, [], _Flags} ->
+        {[], _Flags} ->
             {error, config_no_args};
-        {Keys, Mappings, Flags0}->
-            AppKeyPairs = get_env_keys(Mappings),
-            CuttlefishFlags = get_cuttlefish_flags(Mappings),
+        {KeyMappings, Flags0}->
+            EnvKeys = get_env_keys(KeyMappings),
+            CuttlefishFlags = get_cuttlefish_flags(KeyMappings),
             case clique_parser:validate_flags(config_flags(), Flags0) of
                 {error, _}=E ->
                     E;
                 Flags ->
-                    get_env_status(Keys, AppKeyPairs, CuttlefishFlags, Flags)
+                    get_env_status(EnvKeys, CuttlefishFlags, Flags)
             end
     end.
 
@@ -86,15 +87,15 @@ describe(KeysAndFlags) ->
     case get_valid_mappings(KeysAndFlags) of
         {error, _}=E ->
             E;
-        {_Keys, [], _Flags} ->
+        {[], _Flags} ->
             {error, config_no_args};
         %% TODO: Do we want to allow any flags? --verbose maybe?
-        {_Keys, Mappings, _Flags0} ->
+        {KeyMappings, _Flags0} ->
             [begin
                  Doc = cuttlefish_mapping:doc(M),
                  Name = cuttlefish_variable:format(cuttlefish_mapping:variable(M)),
                  clique_status:text(Name ++ ":\n  " ++ string:join(Doc,"\n  ") ++ "\n")
-             end || M <- Mappings]
+             end || {_, M} <- KeyMappings]
     end.
 
 -spec set([string()]) -> status() | err().
@@ -109,44 +110,44 @@ set(ArgsAndFlags) ->
             []
     end.
 
--spec get_env_status([string()], [{atom(), atom()}], cuttlefish_flag_list(), flags()) -> status() |
-                                                                 err().
-get_env_status(Keys, AppKeyPairs, CuttlefishFlags, []) ->
-    get_local_env_status(Keys, AppKeyPairs, CuttlefishFlags);
-get_env_status(Keys, AppKeyPairs, CuttlefishFlags, Flags) when length(Flags) =:= 1 ->
+-spec get_env_status([envkey()], cuttlefish_flag_list(), flags()) -> status() |
+                                                                                         err().
+get_env_status(EnvKeys, CuttlefishFlags, []) ->
+    get_local_env_status(EnvKeys, CuttlefishFlags);
+get_env_status(EnvKeys, CuttlefishFlags, Flags) when length(Flags) =:= 1 ->
     [{Key, Val}] = Flags,
     case Key of
-        node -> get_remote_env_status(Keys, AppKeyPairs, CuttlefishFlags, Val);
-        all -> get_remote_env_status(Keys, AppKeyPairs, CuttlefishFlags)
+        node -> get_remote_env_status(EnvKeys, CuttlefishFlags, Val);
+        all -> get_remote_env_status(EnvKeys, CuttlefishFlags)
     end;
-get_env_status(_Keys, _AppKeyPairs, _CuttlefishFlags, _Flags) ->
+get_env_status(_EnvKeys, _CuttlefishFlags, _Flags) ->
     app_config_flags_error().
 
--spec get_local_env_status([string()], [{atom(), atom()}], cuttlefish_flag_list()) -> status().
-get_local_env_status(Keys, AppKeyPairs, CuttlefishFlags) ->
-    Row = get_local_env_vals(AppKeyPairs, CuttlefishFlags),
-    [clique_status:table([lists:zip(["Node" | Keys], Row)])].
+-spec get_local_env_status([envkey()], cuttlefish_flag_list()) -> status().
+get_local_env_status(EnvKeys, CuttlefishFlags) ->
+    Row = get_local_env_vals(EnvKeys, CuttlefishFlags),
+    [clique_status:table([Row])].
 
--spec get_local_env_vals([{atom(), atom()}], cuttlefish_flag_list()) -> list().
-get_local_env_vals(AppKeyPairs, CuttlefishFlags) ->
+-spec get_local_env_vals([envkey()], cuttlefish_flag_list()) -> list().
+get_local_env_vals(EnvKeys, CuttlefishFlags) ->
     Vals = [begin
                 {ok, Val} = application:get_env(App, Key),
                 case {CFlagSpec, Val} of
                     {{flag, TrueVal, _}, true} ->
-                        TrueVal;
+                        {KeyStr, TrueVal};
                     {{flag, _, FalseVal}, false} ->
-                        FalseVal;
+                        {KeyStr, FalseVal};
                     _ ->
-                        Val
+                        {KeyStr, Val}
                 end
-            end || {{App, Key}, CFlagSpec} <- lists:zip(AppKeyPairs, CuttlefishFlags)],
-    [node() | Vals].
+            end || {{KeyStr, {App, Key}}, CFlagSpec} <- lists:zip(EnvKeys, CuttlefishFlags)],
+    [{"node", node()} | Vals].
 
--spec get_remote_env_status([string()], [{atom(), atom()}], cuttlefish_flag_list(), node()) ->
+-spec get_remote_env_status([envkey()], cuttlefish_flag_list(), node()) ->
     status().
-get_remote_env_status(Keys, AppKeyPairs, CuttlefishFlags, Node) ->
+get_remote_env_status(EnvKeys, CuttlefishFlags, Node) ->
     case clique_nodes:safe_rpc(Node, ?MODULE, get_local_env_status,
-                               [Keys, AppKeyPairs, CuttlefishFlags]) of
+                               [EnvKeys, CuttlefishFlags]) of
         {badrpc, rpc_process_down} ->
             io:format("Error: Node ~p Down~n", [Node]),
             [];
@@ -154,16 +155,14 @@ get_remote_env_status(Keys, AppKeyPairs, CuttlefishFlags, Node) ->
             Status
     end.
 
--spec get_remote_env_status([string()], [{atom(), atom()}], cuttlefish_flag_list()) -> status().
-get_remote_env_status(Keys0, AppKeyPairs, CuttlefishFlags) ->
+-spec get_remote_env_status([{atom(), atom()}], cuttlefish_flag_list()) -> status().
+get_remote_env_status(EnvKeys, CuttlefishFlags) ->
     Nodes = clique_nodes:nodes(),
-    {Rows0, Down} = rpc:multicall(Nodes,
+    {Rows, Down} = rpc:multicall(Nodes,
                                   ?MODULE,
                                   get_local_env_vals,
-                                  [AppKeyPairs, CuttlefishFlags],
+                                  [EnvKeys, CuttlefishFlags],
                                   60000),
-    Keys = ["Node" | Keys0],
-    Rows = [lists:zip(Keys, Row) || Row <- Rows0],
     Table = clique_status:table(Rows),
     case (Down == []) of
         false ->
@@ -284,40 +283,50 @@ get_valid_mappings(KeysAndFlags) ->
     Keys = [cuttlefish_variable:tokenize(K) || K <- Keys0],
     [{schema, Schema}] = ets:lookup(?schema_table, schema),
     {_Translations, Mappings0, _Validators} = Schema,
-    Mappings = valid_mappings(Keys, Mappings0),
-    case length(Mappings) =:= length(Keys) of
+    KeyMappings0 = valid_mappings(Keys, Mappings0),
+    KeyMappings = match_key_order(Keys0, KeyMappings0),
+    case length(KeyMappings) =:= length(Keys) of
         false ->
-            Invalid = invalid_keys(Keys, Mappings),
+            Invalid = invalid_keys(Keys, KeyMappings),
             {error, {invalid_config_keys, Invalid}};
         true ->
             case clique_parser:parse_flags(Flags0) of
                 {error, _}=E ->
                     E;
                 Flags ->
-                    {Keys0, Mappings, Flags}
+                    {KeyMappings, Flags}
             end
     end.
 
 -spec valid_mappings([cuttlefish_variable:variable()], [tuple()]) -> [tuple()].
 valid_mappings(Keys, Mappings) ->
-    lists:filter(fun(Mapping) ->
-                     Key = cuttlefish_mapping:variable(Mapping),
-                     lists:member(Key, Keys)
-                 end, Mappings).
+    lists:foldl(fun(Mapping, Acc) ->
+                    Key = cuttlefish_mapping:variable(Mapping),
+                    case lists:member(Key, Keys) of
+                        true ->
+                            Key2 = cuttlefish_variable:format(Key),
+                            [{Key2, Mapping} | Acc];
+                        false ->
+                            Acc
+                    end
+                end, [], Mappings).
+
+%% @doc Match the order of Keys in KeyMappings
+match_key_order(Keys, KeyMappings) ->
+    [lists:keyfind(Key, 1, KeyMappings) || Key <- Keys].
 
 -spec invalid_keys([cuttlefish_variable:variable()],
-                   [cuttlefish_mapping:mapping()]) -> [string()].
-invalid_keys(Keys, Mappings) ->
-    Invalid = lists:filter(fun(Key) ->
-                               not lists:keymember(Key, 2, Mappings)
-                           end, Keys),
-   [cuttlefish_variable:format(I)++" " || I <- Invalid].
+                   [{string(), cuttlefish_mapping:mapping()}]) -> [string()].
+invalid_keys(Keys, KeyMappings) ->
+    Valid = [cuttlefish_variable:tokenize(K) || {K, _M} <- KeyMappings],
+    Invalid = Keys -- Valid,
+    [cuttlefish_variable:format(I)++" " || I <- Invalid].
 
--spec get_env_keys([cuttlefish_mapping:mapping()]) -> [{atom(), atom()}].
+-spec get_env_keys([{string(), cuttlefish_mapping:mapping()}]) -> [envkey()].
 get_env_keys(Mappings) ->
-    EnvStrs = [cuttlefish_mapping:mapping(M) || M <- Mappings],
-    AppAndKeys = [string:tokens(S, ".") || S <- EnvStrs],
-    [{list_to_atom(App), list_to_atom(Key)} || [App, Key] <-  AppAndKeys].
+    KeyEnvStrs = [{Var, cuttlefish_mapping:mapping(M)} || {Var, M} <- Mappings],
+    VarAppAndKeys = [{Var, string:tokens(S, ".")} || {Var, S} <- KeyEnvStrs],
+    [{Var, {list_to_atom(App), list_to_atom(Key)}} || {Var, [App, Key]} <- VarAppAndKeys].
 
 %% This is part of a minor hack we've added for correctly displaying config
 %% values of type 'flag'. We pull out any relevant info from the mappings
@@ -327,9 +336,9 @@ get_env_keys(Mappings) ->
 %% Ideally cuttlefish should provide some way of converting values back to
 %% their user-friendly versions (like what you would see in the config file
 %% or pass to riak-admin set) but that may require some more in-depth work...
--spec get_cuttlefish_flags([cuttlefish_mapping:mapping()]) -> cuttlefish_flag_list().
-get_cuttlefish_flags(Mappings) ->
-    NormalizeFlag = fun(M) ->
+-spec get_cuttlefish_flags([{string(), cuttlefish_mapping:mapping()}]) -> cuttlefish_flag_list().
+get_cuttlefish_flags(KeyMappings) ->
+    NormalizeFlag = fun({_, M}) ->
                             case cuttlefish_mapping:datatype(M) of
                                 [flag] ->
                                     {flag, on, off};
@@ -339,7 +348,7 @@ get_cuttlefish_flags(Mappings) ->
                                     undefined
                             end
                     end,
-    lists:map(NormalizeFlag, Mappings).
+    lists:map(NormalizeFlag, KeyMappings).
 
 -spec app_config_flags_error() -> err().
 app_config_flags_error() ->
