@@ -277,7 +277,7 @@ config_flags() ->
 
 
 -spec get_valid_mappings([string()]) -> err() |
-                                        {[string()], [cuttlefish_mapping:mapping()], flags()}.
+                                        {[{string(), cuttlefish_mapping:mapping()}], flags()}.
 get_valid_mappings(KeysAndFlags) ->
     {Keys0, Flags0} = lists:splitwith(fun clique_parser:is_not_flag/1, KeysAndFlags),
     Keys = [cuttlefish_variable:tokenize(K) || K <- Keys0],
@@ -313,7 +313,8 @@ valid_mappings(Keys, Mappings) ->
 
 %% @doc Match the order of Keys in KeyMappings
 match_key_order(Keys, KeyMappings) ->
-    [lists:keyfind(Key, 1, KeyMappings) || Key <- Keys].
+    [lists:keyfind(Key, 1, KeyMappings) || Key <- Keys,
+        lists:keyfind(Key, 1, KeyMappings) /= false].
 
 -spec invalid_keys([cuttlefish_variable:variable()],
                    [{string(), cuttlefish_mapping:mapping()}]) -> [string()].
