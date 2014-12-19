@@ -124,8 +124,8 @@ whitelist(Keys) ->
             ok
     end.
 
--spec keys_in_whitelist([string()]) -> true | {error, {config_not_settable, [string()]}}.
-keys_in_whitelist(Keys) ->
+-spec check_keys_in_whitelist([string()]) -> ok | {error, {config_not_settable, [string()]}}.
+check_keys_in_whitelist(Keys) ->
     Invalid =lists:foldl(fun(K, Acc) ->
                              case ets:lookup(?whitelist_table, K) of
                                  [{_K}] ->
@@ -135,7 +135,7 @@ keys_in_whitelist(Keys) ->
                              end
                          end, [], Keys),
     case Invalid of
-        [] -> true;
+        [] -> ok;
         _ -> {error, {config_not_settable, Invalid}}
     end.
 
@@ -247,8 +247,8 @@ set_config({error, _}=E) ->
     E;
 set_config({AppConfig, Args, Flags}) ->
     Keys = [cuttlefish_variable:format(K) || {K, _}  <- Args],
-    case keys_in_whitelist(Keys) of
-        true ->
+    case check_keys_in_whitelist(Keys) of
+        ok ->
             case set_app_config(AppConfig, Flags) of
                 ok ->
                     {Args, Flags};
