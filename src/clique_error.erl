@@ -20,60 +20,64 @@
 -module(clique_error).
 
 %% API
--export([format/1]).
+-export([format/2]).
 
 -type status() :: clique_status:status().
 -type err() :: {error, term()}.
 
--spec format(err()) -> status().
-format({error, {no_matching_spec, Cmd}}) ->
+-spec format(string(), err()) -> status().
+format(Cmd, {error, show_no_args}) ->
+    status(io_lib:format("Usage: ~ts show <variable> ...", [Cmd]));
+format(Cmd, {error, describe_no_args}) ->
+    status(io_lib:format("Usage: ~ts describe <variable> ...", [Cmd]));
+format(Cmd, {error, set_no_args}) ->
+    status(io_lib:format("Usage: ~ts set <variable>=<value> ...", [Cmd]));
+format(_Cmd, {error, {no_matching_spec, Cmd}}) ->
     case clique_usage:find(Cmd) of
         {error, _} ->
-            status("Invalid Command~n");
+            status(io_lib:format("Invalid command '~ts'", [Cmd]));
         Usage ->
-            status(io_lib:format("~s", [Usage]))
+            status(io_lib:format("~ts", [Usage]))
     end;
-format({error, {invalid_flag, Str}}) ->
-    status(io_lib:format("Invalid Flag: ~p~n", [Str]));
-format({error, {invalid_action, Str}}) ->
-    status(io_lib:format("Invalid Action: ~p~n", [Str]));
-format({error, invalid_number_of_args}) ->
-    status("Invalid number of arguments~n");
-format({error, {invalid_key, Str}}) ->
-    status(io_lib:format("Invalid key: ~p~n", [Str]));
-format({error, {invalid_argument, Str}}) ->
-    status(io_lib:format("Invalid argument: ~p~n", [Str]));
-format({error, {invalid_args, Args}}) ->
+format(_Cmd, {error, {invalid_flag, Str}}) ->
+    status(io_lib:format("Invalid flag: ~p", [Str]));
+format(_Cmd, {error, {invalid_action, Str}}) ->
+    status(io_lib:format("Invalid action: ~p", [Str]));
+format(_Cmd, {error, invalid_number_of_args}) ->
+    status("Invalid number of arguments");
+format(_Cmd, {error, {invalid_key, Str}}) ->
+    status(io_lib:format("Invalid key: ~p", [Str]));
+format(_Cmd, {error, {invalid_argument, Str}}) ->
+    status(io_lib:format("Invalid argument: ~p", [Str]));
+format(_Cmd, {error, {invalid_args, Args}}) ->
     Arglist = lists:map(fun({Key, Val}) -> io_lib:format("~ts=~ts ", [Key, Val]) end, Args),
-    status(io_lib:format("Invalid arguments: ~s~n", [Arglist]));
-format({error, {invalid_flags, Flags}}) ->
-    status(io_lib:format("Invalid Flags: ~p~n", [Flags]));
-format({error, {invalid_flag_value, {Name, Val}}}) ->
-    status(io_lib:format("Invalid value: ~p for flag: ~p~n", [Val, Name]));
-format({error, {invalid_flag_combination, Msg}}) ->
-    status(io_lib:format("Error: ~s~n", [Msg]));
-format({error, {invalid_value, Val}}) ->
-    status(io_lib:format("Invalid value: ~p~n", [Val]));
-format({error, {invalid_kv_arg, Arg}}) ->
+    status(io_lib:format("Invalid arguments: ~ts", [Arglist]));
+format(_Cmd, {error, {invalid_flags, Flags}}) ->
+    status(io_lib:format("Invalid Flags: ~p", [Flags]));
+format(_Cmd, {error, {invalid_flag_value, {Name, Val}}}) ->
+    status(io_lib:format("Invalid value: ~p for flag: ~p", [Val, Name]));
+format(_Cmd, {error, {invalid_flag_combination, Msg}}) ->
+    status(io_lib:format("Error: ~ts", [Msg]));
+format(_Cmd, {error, {invalid_value, Val}}) ->
+    status(io_lib:format("Invalid value: ~p", [Val]));
+format(Cmd, {error, {invalid_kv_arg, Arg}}) ->
     status(io_lib:format(
-        "Not a Key/Value argument of format: ~p=<Value>: ~n", [Arg]));
-format({error, {too_many_equal_signs, Arg}}) ->
-    status(io_lib:format("Too Many Equal Signs in Argument: ~p~n", [Arg]));
-format({error, {invalid_config_keys, Invalid}}) ->
-    status(io_lib:format("Invalid Config Keys: ~s~n", [Invalid]));
-format({error, config_no_args}) ->
-    status("Config Operations require one or more arguments");
-format({error, {invalid_config, {error, [_H|_T]=Msgs}}}) ->
+             "Usage: ~ts set ~ts=<value> ...", [Cmd, Arg]));
+format(_Cmd, {error, {too_many_equal_signs, Arg}}) ->
+    status(io_lib:format("Too many equal signs in argument: ~p", [Arg]));
+format(_Cmd, {error, {invalid_config_keys, Invalid}}) ->
+    status(io_lib:format("Invalid config keys: ~ts", [Invalid]));
+format(_Cmd, {error, {invalid_config, {error, [_H|_T]=Msgs}}}) ->
     %% Cuttlefish deeply nested errors
     status(string:join(lists:map(fun({error, Msg}) -> Msg end,
                                  Msgs), "\n"));
-format({error, {invalid_config, Msg}}) ->
-    status(io_lib:format("Invalid Configuration: ~p~n", [Msg]));
-format({error, {rpc_process_down, Node}}) ->
+format(_Cmd, {error, {invalid_config, Msg}}) ->
+    status(io_lib:format("Invalid configuration: ~p~n", [Msg]));
+format(_Cmd, {error, {rpc_process_down, Node}}) ->
     status(io_lib:format("Target process could not be reached on node: ~p~n", [Node]));
-format({error, {nodedown, Node}}) ->
+format(_Cmd, {error, {nodedown, Node}}) ->
     status(io_lib:format("Target node is down: ~p~n", [Node]));
-format({error, bad_node}) ->
+format(_Cmd, {error, bad_node}) ->
     status("Invalid node name").
 
 -spec status(string()) -> status().
