@@ -70,7 +70,7 @@ show(KeysAndFlags) ->
         {error, _}=E ->
             E;
         {[], _Flags} ->
-            {error, config_no_args};
+            {error, show_no_args};
         {KeyMappings, Flags0}->
             EnvKeys = get_env_keys(KeyMappings),
             CuttlefishFlags = get_cuttlefish_flags(KeyMappings),
@@ -88,7 +88,7 @@ describe(KeysAndFlags) ->
         {error, _}=E ->
             E;
         {[], _Flags} ->
-            {error, config_no_args};
+            {error, describe_no_args};
         %% TODO: Do we want to allow any flags? --verbose maybe?
         {KeyMappings, _Flags0} ->
             [begin
@@ -196,7 +196,7 @@ run_callback({Args, Flags}) ->
 get_config({error, _}=E) ->
     E;
 get_config({[], _Flags}) ->
-    {error, config_no_args};
+    {error, set_no_args};
 get_config({Args, Flags0}) ->
     [{schema, Schema}] = ets:lookup(?schema_table, schema),
     Conf = [{cuttlefish_variable:tokenize(atom_to_list(K)), V} || {K, V} <- Args],
@@ -358,4 +358,3 @@ get_cuttlefish_flags(KeyMappings) ->
 app_config_flags_error() ->
     Msg = "Cannot use --all(-a) and --node(-n) at the same time",
     {error, {invalid_flag_combination, Msg}}.
-
