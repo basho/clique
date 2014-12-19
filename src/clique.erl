@@ -65,8 +65,7 @@ register_usage(Cmd, Usage) ->
 print(usage, Cmd) ->
     clique_usage:print(Cmd);
 print({error, _}=E, Cmd) ->
-    Alert = clique_error:format(E),
-    print(Alert, Cmd);
+    clique_usage:print(Cmd, clique_error:extract_alert(clique_error:format(E)));
 print(Status, _Cmd) ->
     Output = clique_human_writer:write(Status),
     io:format("~ts", [Output]),

@@ -20,12 +20,18 @@
 -module(clique_error).
 
 %% API
--export([format/1]).
+-export([format/1, extract_alert/1]).
 
 -type status() :: clique_status:status().
 -type err() :: {error, term()}.
 
 -spec format(err()) -> status().
+format({error, show_no_args}) ->
+    status("Usage: show <variable> ...");
+format({error, describe_no_args}) ->
+    status("Usage: describe <variable> ...");
+format({error, set_no_args}) ->
+    status("Usage: set <variable>=<value>");
 format({error, {no_matching_spec, Cmd}}) ->
     case clique_usage:find(Cmd) of
         {error, _} ->
@@ -56,19 +62,17 @@ format({error, {invalid_value, Val}}) ->
     status(io_lib:format("Invalid value: ~p~n", [Val]));
 format({error, {invalid_kv_arg, Arg}}) ->
     status(io_lib:format(
-        "Not a Key/Value argument of format: ~p=<Value>: ~n", [Arg]));
+        "Must be in the format ~ts=<value> ~n", [Arg]));
 format({error, {too_many_equal_signs, Arg}}) ->
-    status(io_lib:format("Too Many Equal Signs in Argument: ~p~n", [Arg]));
+    status(io_lib:format("Too many equal signs in argument: ~p~n", [Arg]));
 format({error, {invalid_config_keys, Invalid}}) ->
-    status(io_lib:format("Invalid Config Keys: ~s~n", [Invalid]));
-format({error, config_no_args}) ->
-    status("Config Operations require one or more arguments");
+    status(io_lib:format("Invalid config keys: ~s~n", [Invalid]));
 format({error, {invalid_config, {error, [_H|_T]=Msgs}}}) ->
     %% Cuttlefish deeply nested errors
     status(string:join(lists:map(fun({error, Msg}) -> Msg end,
                                  Msgs), "\n"));
 format({error, {invalid_config, Msg}}) ->
-    status(io_lib:format("Invalid Configuration: ~p~n", [Msg]));
+    status(io_lib:format("Invalid configuration: ~p~n", [Msg]));
 format({error, {rpc_process_down, Node}}) ->
     status(io_lib:format("Target process could not be reached on node: ~p~n", [Node]));
 format({error, {nodedown, Node}}) ->
@@ -79,3 +83,12 @@ format({error, bad_node}) ->
 -spec status(string()) -> status().
 status(Str) ->
     [clique_status:alert([clique_status:text(Str)])].
+
+%% Grab the first alert message for cli operator errors
+-spec extract_alert(status()) -> string().
+extract_alert([]) ->
+    "";
+extract_alert([{alert, [{text, Msg}]}|_T]) ->
+    Msg;
+extract_alert([_H|T]) ->
+    extract_alert(T).
