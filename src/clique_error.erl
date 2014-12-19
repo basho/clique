@@ -75,6 +75,8 @@ format(_Cmd, {error, {invalid_config, Msg}}) ->
     status(io_lib:format("Invalid configuration: ~p~n", [Msg]));
 format(_Cmd, {error, {rpc_process_down, Node}}) ->
     status(io_lib:format("Target process could not be reached on node: ~p~n", [Node]));
+format(_Cmd, {error, {config_not_settable, Keys}}) ->
+    status(io_lib:format("The following config keys are not settable: ~p~n", [Keys]));
 format(_Cmd, {error, {nodedown, Node}}) ->
     status(io_lib:format("Target node is down: ~p~n", [Node]));
 format(_Cmd, {error, bad_node}) ->

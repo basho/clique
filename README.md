@@ -171,6 +171,19 @@ Callback = fun set_transfer_limit/3,
 clique:register_config(Key, Callback).
 ```
 
+### register_config_whitelist/1
+A lot of configuration variables are not intended to be set at runtime. In order to prevent the user
+from changing them and anticipating the system to use the new values, we don't allow setting of any
+variable by default. Each configuration variable that is settable must be added to a whitelist.
+
+```erlang
+%% Fail Fast if we pass in a value that is not the name of a configuration variable
+ok = register_config_whitelist(["transfer_limit", "handoff.outbound", "handoff.inbound"]).
+```
+
+Note that in the future we hope to remove the need for this function by adding support for whitelist
+annotations to cuttlefish variables instead.
+
 ### register_command/4
 Users can create their own CLI commands that are not directly configuration
 related. These commands are relatively free-form, with the only restrictions
