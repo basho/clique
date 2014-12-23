@@ -363,7 +363,8 @@ get_valid_mappings(KeysAndFlags) ->
             end
     end.
 
--spec valid_mappings([cuttlefish_variable:variable()], [tuple()]) -> [tuple()].
+-spec valid_mappings([cuttlefish_variable:variable()], [cuttlefish_mapping:mapping()]) ->
+    [{string(), cuttlefish_mapping:mapping()}].
 valid_mappings(Keys, Mappings) ->
     lists:foldl(fun(Mapping, Acc) ->
                     Key = cuttlefish_mapping:variable(Mapping),
