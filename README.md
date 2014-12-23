@@ -186,6 +186,29 @@ Callback = fun set_transfer_limit/3,
 clique:register_config(Key, Callback).
 ```
 
+### register_config_formatter/2
+By default, the clique "show" command displays the underlying config value, as stored in the
+corresponding application env variable (the one exception being values of type "flag", which are
+automatically displayed by clique as the user-facing flag value defined in the cuttlefish schema).
+In many cases this is fine, but sometimes there may be translations defined in the cuttlefish schema
+which make it desirable to show config values in a different format than the one used by the
+underlying Erlang code.
+
+To show a specific config value using a different format than the underlying raw application
+config, you can register a config formatter against that value's config key:
+
+```erlang
+F = fun(Val) ->
+        case Val of
+            riak_kv_bitcask_backend -> bitcask;
+            riak_kv_eleveldb_backend -> leveldb;
+            riak_kv_memory_backend -> memory;
+            riak_kv_multi_backend -> multi
+        end
+    end,
+clique:register_config_formatter(["storage_backend"], F).
+```
+
 ### register_config_whitelist/1
 A lot of configuration variables are not intended to be set at runtime. In order to prevent the user
 from changing them and anticipating the system to use the new values, we don't allow setting of any
