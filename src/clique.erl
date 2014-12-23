@@ -24,6 +24,7 @@
          register_node_finder/1,
          register_command/4,
          register_config/2,
+         register_formatter/2,
          register_config_whitelist/1,
          register_usage/2,
          run/1,
@@ -49,6 +50,11 @@ register_node_finder(Fun) ->
 -spec register_config([string()], fun()) -> true.
 register_config(Key, Callback) ->
     clique_config:register(Key, Callback).
+
+%% @doc Register a configuration formatter for a given config key
+-spec register_formatter([string()], fun()) -> true.
+register_formatter(Key, Callback) ->
+    clique_config:register_formatter(Key, Callback).
 
 %% @doc Register a list of configuration variables that are settable.
 %% Clique disallows setting of all config variables by default. They must be in
