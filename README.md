@@ -101,6 +101,21 @@ appropriately dispatched via the registry. Each registered callback returns a
 [status type](https://github.com/basho/clique/blob/develop/src/clique_status.erl)
 that allows clique to format the output in a standardized way.
 
+### Load Schemas
+Clique requires applications to load their cuttlefish schemas prior to calling `register_config/1` or
+`register_config_whitelist/1`. Below shows how `riak_core` loads schemas in a flexible manner
+allowing for release or test usage.
+
+```erlang
+load_schema() ->
+    case application:get_env(riak_core, schema_dirs) of
+        {ok, Directories} ->
+            ok = clique_config:load_schema(Directories);
+        _ ->
+            ok = clique_config:load_schema([code:lib_dir()])
+    end.
+```
+
 ### register/1
 Register is a convenience function that gets called by an app with a list
 of modules that implement the ``clique_handler`` behaviour. This behaviour
