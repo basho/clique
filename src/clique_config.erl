@@ -22,6 +22,7 @@
 %% API
 -export([init/0,
          register/2,
+         register_formatter/2,
          show/1,
          set/1,
          whitelist/1,
@@ -36,6 +37,7 @@
 -define(config_table, clique_config).
 -define(schema_table, clique_schema).
 -define(whitelist_table, clique_whitelist).
+-define(formatter_table, clique_formatter).
 
 -type err() :: {error, term()}.
 -type status() :: clique_status:status().
@@ -51,10 +53,16 @@
 register(Key, Callback) ->
     ets:insert(?config_table, {Key, Callback}).
 
+%% @doc Register a pretty-print function for a given config key
+-spec register_formatter([string()], fun()) -> true.
+register_formatter(Key, Callback) ->
+    ets:insert(?formatter_table, {Key, Callback}).
+
 init() ->
     _ = ets:new(?config_table, [public, named_table]),
     _ = ets:new(?schema_table, [public, named_table]),
     _ = ets:new(?whitelist_table, [public, named_table]),
+    _ = ets:new(?formatter_table, [public, named_table]),
     ok.
 
 %% @doc Load Schemas into ets when given directories containing the *.schema files.
@@ -78,14 +86,6 @@ schema_paths(Directories) ->
                     Files ++ Acc
                 end, [], Directories).
 
-%% TODO: This doesn't work for keys with translations.
-%% This should almost certainly show the riak.conf value.
-%% But, there's not currently any way to reverse cuttlefish
-%% translations to get from the application env value back
-%% to the value you'd see in the config file or use with
-%% the "set" command. We do support flags because those are
-%% reversible, but to fully support all possible values we'll
-%% have to add reverse translation support to cuttlefish.
 -spec show([string()]) -> clique_status:status() | err().
 show(KeysAndFlags) ->
     case get_valid_mappings(KeysAndFlags) of
@@ -180,14 +180,22 @@ get_local_env_status(EnvKeys, CuttlefishFlags) ->
 get_local_env_vals(EnvKeys, CuttlefishFlags) ->
     Vals = [begin
                 {ok, Val} = application:get_env(App, Key),
-                case {CFlagSpec, Val} of
-                    {{flag, TrueVal, _}, true} ->
-                        {KeyStr, TrueVal};
-                    {{flag, _, FalseVal}, false} ->
-                        {KeyStr, FalseVal};
-                    _ ->
-                        {KeyStr, Val}
-                end
+                Val1 = case {CFlagSpec, Val} of
+                           {{flag, TrueVal, _}, true} ->
+                               TrueVal;
+                           {{flag, _, FalseVal}, false} ->
+                               FalseVal;
+                           _ ->
+                               Val
+                       end,
+                FormatterKey = cuttlefish_variable:tokenize(KeyStr),
+                Val2 = case ets:lookup(?formatter_table, FormatterKey) of
+                           [] ->
+                               Val1;
+                           [{_K, FormatterFun}] ->
+                               FormatterFun(Val1)
+                       end,
+                {KeyStr, Val2}
             end || {{KeyStr, {App, Key}}, CFlagSpec} <- lists:zip(EnvKeys, CuttlefishFlags)],
     [{"node", node()} | Vals].
 
@@ -355,7 +363,8 @@ get_valid_mappings(KeysAndFlags) ->
             end
     end.
 
--spec valid_mappings([cuttlefish_variable:variable()], [tuple()]) -> [tuple()].
+-spec valid_mappings([cuttlefish_variable:variable()], [cuttlefish_mapping:mapping()]) ->
+    [{string(), cuttlefish_mapping:mapping()}].
 valid_mappings(Keys, Mappings) ->
     lists:foldl(fun(Mapping, Acc) ->
                     Key = cuttlefish_mapping:variable(Mapping),
