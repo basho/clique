@@ -25,7 +25,8 @@
          show/1,
          set/1,
          whitelist/1,
-         describe/1]).
+         describe/1,
+         load_schema/1]).
 
 %% Callbacks for rpc calls
 -export([get_local_env_status/2,
@@ -54,10 +55,28 @@ init() ->
     _ = ets:new(?config_table, [public, named_table]),
     _ = ets:new(?schema_table, [public, named_table]),
     _ = ets:new(?whitelist_table, [public, named_table]),
-    SchemaFiles = filelib:wildcard(code:lib_dir() ++ "/*.schema"),
-    Schema = cuttlefish_schema:files(SchemaFiles),
-    true = ets:insert(?schema_table, {schema, Schema}),
     ok.
+
+%% @doc Load Schemas into ets when given directories containing the *.schema files.
+%% Note that this must be run before any registrations are made.
+-spec load_schema([string()]) -> ok | {error, schema_files_not_found}.
+load_schema(Directories) ->
+    SchemaFiles = schema_paths(Directories),
+    case SchemaFiles of
+        [] ->
+            {error, schema_files_not_found};
+        _ ->
+            Schema = cuttlefish_schema:files(SchemaFiles),
+            true = ets:insert(?schema_table, {schema, Schema}),
+            ok
+    end.
+
+-spec schema_paths([string()]) -> [string()].
+schema_paths(Directories) ->
+    lists:foldl(fun(Dir, Acc) ->
+                    Files = filelib:wildcard(Dir ++ "/*.schema"),
+                    Files ++ Acc
+                end, [], Directories).
 
 %% TODO: This doesn't work for keys with translations.
 %% This should almost certainly show the riak.conf value.
@@ -393,3 +412,16 @@ get_cuttlefish_flags(KeyMappings) ->
 app_config_flags_error() ->
     Msg = "Cannot use --all(-a) and --node(-n) at the same time",
     {error, {invalid_flag_combination, Msg}}.
+
+-ifdef(TEST).
+-include_lib("eunit/include/eunit.hrl").
+
+schema_paths_test() ->
+    ok = file:write_file("example.schema", <<"thisisnotarealschema">>),
+    {ok, Cwd} = file:get_cwd(),
+    Schemas = schema_paths([Cwd]),
+    ?assertEqual([Cwd++"/example.schema"], Schemas),
+    ok = file:delete("example.schema"),
+    ?assertEqual([], schema_paths([Cwd])).
+
+-endif.
