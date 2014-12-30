@@ -75,7 +75,7 @@ format(_Cmd, {error, {invalid_config, {errorlist, Errors}}}) ->
     %% Cuttlefish deeply nested errors (new cuttlefish error scheme)
     status(string:join(lists:map(fun({error, ErrorTerm}) ->
                                          cuttlefish_error:xlate(ErrorTerm) end,
-                                 Msgs), "\n"));
+                                 Errors), "\n"));
 format(_Cmd, {error, {invalid_config, Msg}}) ->
     status(io_lib:format("Invalid configuration: ~p~n", [Msg]));
 format(_Cmd, {error, {rpc_process_down, Node}}) ->
