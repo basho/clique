@@ -68,8 +68,13 @@ format(_Cmd, {error, {too_many_equal_signs, Arg}}) ->
 format(_Cmd, {error, {invalid_config_keys, Invalid}}) ->
     status(io_lib:format("Invalid config keys: ~ts", [Invalid]));
 format(_Cmd, {error, {invalid_config, {error, [_H|_T]=Msgs}}}) ->
-    %% Cuttlefish deeply nested errors
+    %% Cuttlefish deeply nested errors (original cuttlefish)
     status(string:join(lists:map(fun({error, Msg}) -> Msg end,
+                                 Msgs), "\n"));
+format(_Cmd, {error, {invalid_config, {errorlist, Errors}}}) ->
+    %% Cuttlefish deeply nested errors (new cuttlefish error scheme)
+    status(string:join(lists:map(fun({error, ErrorTerm}) ->
+                                         cuttlefish_error:xlate(ErrorTerm) end,
                                  Msgs), "\n"));
 format(_Cmd, {error, {invalid_config, Msg}}) ->
     status(io_lib:format("Invalid configuration: ~p~n", [Msg]));
