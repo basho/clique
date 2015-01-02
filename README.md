@@ -1,3 +1,6 @@
+# Dumb Change to Test Bors
+Let's do this.
+
 # Introduction
 Clique is an opinionated framework for building command line interfaces in
 Erlang. It provides users with an interface that gives them enough power to
