@@ -19,9 +19,16 @@
 %% -------------------------------------------------------------------
 -module(clique_usage).
 
+-ifdef(TEST).
+-compile(export_all).
+-include_lib("eunit/include/eunit.hrl").
+-endif.
+
 -define(usage_table, clique_usage).
+-define(usage_prefix, "Usage: ").
 
 -type err() :: {error, term()}.
+-type usage_function() :: fun(() -> iolist()).
 
 %% API
 -export([init/0,
@@ -35,9 +42,8 @@ init() ->
 
 %% @doc Register usage for a given command sequence. Lookups are by longest
 %% match.
--spec register([string()], iolist()) -> true.
-register(Cmd, Usage0) ->
-    Usage = ["Usage: ", Usage0],
+-spec register([string()], iolist() | usage_function()) -> true.
+register(Cmd, Usage) ->
     ets:insert(?usage_table, {Cmd, Usage}).
 
 -spec print(iolist()) -> ok.
@@ -55,10 +61,27 @@ find([]) ->
     {error, "Error: Usage information not found for the given command\n\n"};
 find(Cmd) ->
     case ets:lookup(?usage_table, Cmd) of
+        [{Cmd, Fun}] when is_function(Fun) ->
+            [?usage_prefix, Fun()];
         [{Cmd, Usage}] ->
-            Usage;
+            [?usage_prefix, Usage];
         [] ->
             Cmd2 = lists:reverse(tl(lists:reverse(Cmd))),
             find(Cmd2)
     end.
 
+-ifdef(TEST).
+find_different_types_test() ->
+    {setup,
+     fun init/0,
+     fun(_) -> ets:delete(?usage_table) end,
+     ?_test(begin
+                String = "clique foo [-f]\n",
+                Fun = fun() -> String end,
+                ?MODULE:register(["fun", "usage"], Fun),
+                ?MODULE:register(["string", "usage"], String),
+                ?assertEqual([?usage_prefix, String], find(["fun", "usage"])),
+                ?assertEqual([?usage_prefix, String], find(["string", "usage"])),
+                ?assertMatch({error, _}, find(["foo"]))
+            end)}.
+-endif.
