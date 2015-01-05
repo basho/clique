@@ -275,6 +275,10 @@ these points is hit, via longest match with the command string, the registered
 usage string will be shown. Note that "Usage: " will be prepended to the string,
 so don't add that part in.
 
+If you'd like to generate usage output dynamically, pass a 0-arity
+function that returns an `iolist()` and it will be called when output
+is generated.
+
 ```erlang
 handoff_usage() ->
     ["riak-admin handoff <sub-command>\n\n",
@@ -289,16 +293,20 @@ handoff_limit_usage() ->
      "Options\n\n",
      "  -n <Node>, --node <Node>\n",
      "      Show the handoff limit for the given node only\n\n",
+     io_lib:format("      This node is: ~p~n", [node()]),
      "  -f, --force-rpc\n",
      "      Retrieve the latest value from a given node or nodes via rpc\n",
-     "      instead of using cluster metadata which may not have propogated\n",
+     "      instead of using cluster metadata which may not have propagated\n",
      "      to the local node yet. WARNING: The use of this flag is not\n",
      "      recommended as it spams the cluster with messages instead of\n",
      "      just talking to the local node.\n\n"
      ].
 
+%% Use a static iolist():
 clique:register_usage(["riak-admin", "handoff"], handoff_usage()),
-clique:register_usage(["riak-admin", "handoff", "limit"], handoff_limit_usage()).
+
+%% Register a callback for dynamic output:
+clique:register_usage(["riak-admin", "handoff", "limit"], fun handoff_limit_usage/0).
 ```
 
 ### run/1
