@@ -68,9 +68,12 @@ format(_Cmd, {error, {too_many_equal_signs, Arg}}) ->
 format(_Cmd, {error, {invalid_config_keys, Invalid}}) ->
     status(io_lib:format("Invalid config keys: ~ts", [Invalid]));
 format(_Cmd, {error, {invalid_config, {error, [_H|_T]=Msgs}}}) ->
-    %% Cuttlefish deeply nested errors
+    %% Cuttlefish deeply nested errors (original cuttlefish)
     status(string:join(lists:map(fun({error, Msg}) -> Msg end,
                                  Msgs), "\n"));
+format(_Cmd, {error, {invalid_config, {errorlist, Errors}}}) ->
+    %% Cuttlefish deeply nested errors (new cuttlefish error scheme)
+    status(string:join(lists:map(fun error_map/1, Errors), "\n"));
 format(_Cmd, {error, {invalid_config, Msg}}) ->
     status(io_lib:format("Invalid configuration: ~p~n", [Msg]));
 format(_Cmd, {error, {rpc_process_down, Node}}) ->
@@ -85,3 +88,11 @@ format(_Cmd, {error, bad_node}) ->
 -spec status(string()) -> status().
 status(Str) ->
     [clique_status:alert([clique_status:text(Str)])].
+
+%% Here we can override cuttlefish error messages to make them more
+%% useful in an interactive context
+-spec error_map(cuttlefish_error:error()) -> iolist().
+error_map({error, {unknown_variable, Variable}}) ->
+    io_lib:format("Unknown variable: ~ts", [Variable]);
+error_map({error, ErrorTerm}) ->
+    cuttlefish_error:xlate(ErrorTerm).
