@@ -23,6 +23,8 @@
 %% clique_status:parse/3. It specifically formats the output for a human at the
 %% console and handles an opaque context passed back during parsing.
 
+-behavior(clique_writer).
+
 %% API
 -export([write/1]).
 

@@ -25,6 +25,7 @@
          register_command/4,
          register_config/2,
          register_formatter/2,
+         register_writer/2,
          register_config_whitelist/1,
          register_usage/2,
          run/1,
@@ -56,6 +57,11 @@ register_config(Key, Callback) ->
 register_formatter(Key, Callback) ->
     clique_config:register_formatter(Key, Callback).
 
+%% @doc Register a module for writing output in a specific format
+-spec register_writer(string(), module()) -> true.
+register_writer(Name, Module) ->
+    clique_writer:register(Name, Module).
+
 %% @doc Register a list of configuration variables that are settable.
 %% Clique disallows setting of all config variables by default. They must be in
 %% whitelist to be settable.
@@ -76,15 +82,18 @@ register_usage(Cmd, Usage) ->
 
 %% @doc Take a list of status types and generate console output
 -spec print(err() | clique_status:status(), [string()]) -> ok.
-print(usage, Cmd) ->
+print(Status, Cmd) ->
+    print(Status, Cmd, "human").
+
+-spec print(err() | clique_status:status(), [string()], string()) -> ok.
+print(usage, Cmd, _Format) ->
     clique_usage:print(Cmd);
-print({error, _}=E, Cmd) ->
+print({error, _}=E, Cmd, Format) ->
     Alert = clique_error:format(hd(Cmd), E),
-    print(Alert, Cmd);
-print(Status, _Cmd) ->
-    Output = clique_human_writer:write(Status),
-    io:format("~ts", [Output]),
-    ok.
+    print(Alert, Cmd, Format);
+print(Status, _Cmd, Format) ->
+    Output = clique_writer:write(Status, Format),
+    io:format("~ts", [Output]).
 
 %% @doc Run a config operation or command
 -spec run([string()]) -> ok | {error, term()}.
@@ -95,23 +104,31 @@ run([_Script, "show" | Args] = Cmd) ->
 run([_Script, "describe" | Args] = Cmd) ->
     print(clique_config:describe(Args), Cmd);
 run(Cmd0) ->
-    case is_help(Cmd0) of
-        {ok, Cmd} ->
+    {GlobalFlags, Cmd} = extract_global_flags(Cmd0),
+    case proplists:get_bool(help, GlobalFlags) of
+        true ->
             clique_usage:print(Cmd);
-        _ ->
-            M0 = clique_command:match(Cmd0),
+        false ->
+            Format = proplists:get_value(format, GlobalFlags, "human"),
+            M0 = clique_command:match(Cmd),
             M1 = clique_parser:parse(M0),
             M2 = clique_parser:validate(M1),
-            print(clique_command:run(M2), Cmd0)
+            print(clique_command:run(M2), Cmd0, Format)
     end.
 
-%% @doc Help flags always comes at the end of the command
--spec is_help(iolist()) -> {ok, iolist()} | false.
-is_help(Str) ->
-    [H | T] = lists:reverse(Str),
-    case H =:= "--help" orelse H =:= "-h" of
-        true ->
-            {ok, lists:reverse(T)};
-        false ->
-            false
-    end.
+%% @doc Returns a list of globally applicable flags (e.g. --help), along with
+%% the original command string minus the global flags that were pulled out.
+-spec extract_global_flags([string()]) -> {[{atom(), term()}], [string()]}.
+extract_global_flags(Cmd) ->
+    FoldFun = fun(E, {GlobalAcc, CmdAcc}) ->
+                      case E of
+                          "--format=" ++ Format ->
+                              {[{format, Format} | GlobalAcc], CmdAcc};
+                          _ when E =:= "--help" ; E =:= "-h" ->
+                              {[{help, true} | GlobalAcc], CmdAcc};
+                          _ ->
+                              {GlobalAcc, [E | CmdAcc]}
+                      end
+              end,
+    {Globals, RevCmd} = lists:foldl(FoldFun, {[], []}, Cmd),
+    {Globals, lists:reverse(RevCmd)}.
