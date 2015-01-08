@@ -22,7 +22,10 @@
 
 -define(writer_table, clique_writers).
 
--define(BUILTIN_WRITERS, [{"human", clique_human_writer}]).
+-define(BUILTIN_WRITERS, [
+                          {"human", clique_human_writer},
+                          {"csv", clique_csv_writer}
+                         ]).
 
 -export([
          init/0,
