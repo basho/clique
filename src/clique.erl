@@ -97,8 +97,6 @@ print(Status, _Cmd, Format) ->
 
 %% @doc Run a config operation or command
 -spec run([string()]) -> ok | {error, term()}.
-run([_Script, "set" | Args] = Cmd) ->
-    print(clique_config:set(Args), Cmd);
 run([_Script, "show" | Args] = Cmd) ->
     print(clique_config:show(Args), Cmd);
 run([_Script, "describe" | Args] = Cmd) ->

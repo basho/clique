@@ -23,8 +23,9 @@
 -export([init/0,
          register/2,
          register_formatter/2,
+         config_flags/0,
          show/1,
-         set/1,
+         set/2,
          whitelist/1,
          describe/1,
          load_schema/1]).
@@ -120,12 +121,11 @@ describe(KeysAndFlags) ->
              end || {_, M} <- KeyMappings]
     end.
 
--spec set([string()]) -> status() | err().
-set(ArgsAndFlags) ->
-    M1 = clique_parser:parse(ArgsAndFlags),
-    M2 = get_config(M1),
-    M3 = set_config(M2),
-    case run_callback(M3) of
+-spec set(proplist(), proplist()) -> status() | err().
+set(Args, Flags) ->
+    M1 = get_config({Args, Flags}),
+    M2 = set_config(M1),
+    case run_callback(M2) of
         {error, _}=E ->
             E;
         _ ->
@@ -253,19 +253,14 @@ get_config({error, _}=E) ->
     E;
 get_config({[], _Flags}) ->
     {error, set_no_args};
-get_config({Args, Flags0}) ->
+get_config({Args, Flags}) ->
     [{schema, Schema}] = ets:lookup(?schema_table, schema),
     Conf = [{cuttlefish_variable:tokenize(atom_to_list(K)), V} || {K, V} <- Args],
     case cuttlefish_generator:minimal_map(Schema, Conf) of
         {error, _, Msg} ->
             {error, {invalid_config, Msg}};
         AppConfig ->
-            case clique_parser:validate_flags(config_flags(), Flags0) of
-                {error, _}=E ->
-                    E;
-                Flags ->
-                    {AppConfig, Conf, Flags}
-            end
+            {AppConfig, Conf, Flags}
     end.
 
 -spec set_config(err()) -> err();

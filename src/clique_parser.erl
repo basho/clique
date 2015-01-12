@@ -33,7 +33,7 @@
 
 %% TODO: A spec should probably just be a record
 -type spec() :: {atom(), proplist()}.
--type keyspecs() :: [spec()].
+-type keyspecs() :: '_' | [spec()].
 -type flagspecs() :: [spec()].
 
 -spec parse(err()) -> err();
@@ -134,12 +134,12 @@ validate({Spec, Args0, Flags0}) ->
     end.
 
 -spec validate_args(keyspecs(), proplist()) -> err() | proplist().
+validate_args('_', Args) ->
+    Args;
 validate_args(KeySpecs, Args) ->
     convert_args(KeySpecs, Args, []).
 
 -spec convert_args(keyspecs(), proplist(), proplist()) -> err() | proplist().
-convert_args([], [], Acc) ->
-    Acc;
 convert_args(_KeySpec, [], Acc) ->
     Acc;
 convert_args([], Args, _Acc) ->
@@ -171,8 +171,6 @@ validate_flags(FlagSpecs, Flags) ->
     convert_flags(FlagSpecs, Flags, []).
 
 -spec convert_flags(flagspecs(), proplist(), flags()) -> err() | flags().
-convert_flags([], [], Acc) ->
-    Acc;
 convert_flags(_FlagSpecs, [], Acc) ->
     Acc;
 convert_flags([], Provided, _Acc) ->

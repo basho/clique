@@ -32,6 +32,8 @@
 -type proplist() :: [{atom(), term()}].
 -type status() :: clique_status:status().
 
+-define(SET_CMD_SPEC, {["_", "set"], '_', clique_config:config_flags(), fun clique_config:set/2}).
+
 init() ->
     _ = ets:new(?cmd_table, [public, named_table]),
     ok.
@@ -51,11 +53,17 @@ run({Fun, Args, Flags}) ->
 -spec match([list()])-> {tuple(), list()} | {error, no_matching_spec}.
 match(Cmd0) ->
     {Cmd, Args} = split_command(Cmd0),
-    case ets:lookup(?cmd_table, Cmd) of
-        [Spec] ->
-            {Spec, Args};
-        [] ->
-            {error, {no_matching_spec, Cmd0}}
+    %% Check for builtin commands first. If that fails, check our command table.
+    case Cmd of
+        [_Script, "set" | _] ->
+            {?SET_CMD_SPEC, Args};
+        _ ->
+            case ets:lookup(?cmd_table, Cmd) of
+                [Spec] ->
+                    {Spec, Args};
+                [] ->
+                    {error, {no_matching_spec, Cmd0}}
+            end
     end.
 
 -spec split_command([list()]) -> {list(), list()}.
