@@ -81,11 +81,15 @@ register_usage(Cmd, Usage) ->
     clique_usage:register(Cmd, Usage).
 
 %% @doc Take a list of status types and generate console output
--spec print(err() | clique_status:status(), [string()]) -> ok.
+-spec print(err() | clique_status:status() | {clique_status:status(), string()}, [string()]) -> ok.
+print({error, _} = E, Cmd) ->
+    print(E, Cmd, "human");
+print({Status, Format}, Cmd) ->
+    print(Status, Cmd, Format);
 print(Status, Cmd) ->
     print(Status, Cmd, "human").
 
--spec print(err() | clique_status:status(), [string()], string()) -> ok.
+-spec print(usage | err() | clique_status:status(), [string()], string()) -> ok.
 print(usage, Cmd, _Format) ->
     clique_usage:print(Cmd);
 print({error, _}=E, Cmd, Format) ->
@@ -97,32 +101,9 @@ print(Status, _Cmd, Format) ->
 
 %% @doc Run a config operation or command
 -spec run([string()]) -> ok | {error, term()}.
-run(Cmd0) ->
-    {GlobalFlags, Cmd} = extract_global_flags(Cmd0),
-    case proplists:get_bool(help, GlobalFlags) of
-        true ->
-            clique_usage:print(Cmd);
-        false ->
-            Format = proplists:get_value(format, GlobalFlags, "human"),
-            M0 = clique_command:match(Cmd),
-            M1 = clique_parser:parse(M0),
-            M2 = clique_parser:validate(M1),
-            print(clique_command:run(M2), Cmd0, Format)
-    end.
-
-%% @doc Returns a list of globally applicable flags (e.g. --help), along with
-%% the original command string minus the global flags that were pulled out.
--spec extract_global_flags([string()]) -> {[{atom(), term()}], [string()]}.
-extract_global_flags(Cmd) ->
-    FoldFun = fun(E, {GlobalAcc, CmdAcc}) ->
-                      case E of
-                          "--format=" ++ Format ->
-                              {[{format, Format} | GlobalAcc], CmdAcc};
-                          _ when E =:= "--help" ; E =:= "-h" ->
-                              {[{help, true} | GlobalAcc], CmdAcc};
-                          _ ->
-                              {GlobalAcc, [E | CmdAcc]}
-                      end
-              end,
-    {Globals, RevCmd} = lists:foldl(FoldFun, {[], []}, Cmd),
-    {Globals, lists:reverse(RevCmd)}.
+run(Cmd) ->
+    M0 = clique_command:match(Cmd),
+    M1 = clique_parser:parse(M0),
+    M2 = clique_parser:extract_global_flags(M1),
+    M3 = clique_parser:validate(M2),
+    print(clique_command:run(M3), Cmd).

@@ -22,6 +22,7 @@
 %% API
 -export([parse/1,
          parse_flags/1,
+         extract_global_flags/1,
          validate/1,
          validate_flags/2,
          is_not_kv_arg/1,
@@ -114,12 +115,31 @@ parse_flags([Val | T], [Flag], Acc) ->
 parse_flags([Val | _T], [], _Acc) ->
     {error, {invalid_flag, Val}}.
 
+%% TODO: If this gets more complicated, write out a function to extract
+%% the flag names from ?GFLAG_SPECS instead of hand-coding it in ?GLOBAL_FLAGS
+-define(GLOBAL_FLAGS, [$h, help, format]).
+-define(GFLAG_SPECS, [{help, [{shortname, "h"},
+                              {longname, "help"}]},
+                      {format, [{longname, "format"}]}]).
+%% @doc Extracts a list of globally applicable flags (e.g. --help) from the
+%% the original command.
+-spec extract_global_flags(err()) -> err();
+                          ({tuple(), proplist(), flags()}) ->
+                              {tuple(), proplist(), flags(), flags()}.
+extract_global_flags({error, _} = E) ->
+    E;
+extract_global_flags({Spec, Args, Flags0}) ->
+    PartFun = fun({K, _V}) -> lists:member(K, ?GLOBAL_FLAGS) end,
+    {GlobalFlags0, Flags} = lists:partition(PartFun, Flags0),
+    GlobalFlags = validate_flags(?GFLAG_SPECS, GlobalFlags0),
+    {Spec, Args, Flags, GlobalFlags}.
+
 -spec validate(err()) -> err();
               ({tuple(), proplist(), [flags()]}) ->
                   err() | {fun(), proplist(), flags()}.
 validate({error, _}=E) ->
     E;
-validate({Spec, Args0, Flags0}) ->
+validate({Spec, Args0, Flags0, GlobalFlags}) ->
     {_Cmd, KeySpecs, FlagSpecs, Callback} = Spec,
     case validate_args(KeySpecs, Args0) of
         {error, _}=E ->
@@ -129,7 +149,7 @@ validate({Spec, Args0, Flags0}) ->
                 {error, _}=E ->
                     E;
                 Flags ->
-                    {Callback, Args, Flags}
+                    {Callback, Args, Flags, GlobalFlags}
             end
     end.
 
@@ -305,7 +325,7 @@ validate_valid_short_flag_test() ->
     Args = [],
     Node = "dev2@127.0.0.1",
     Flags = [{$n, Node}, {$f, undefined}],
-    {undefined, [], ConvertedFlags} = validate({Spec, Args, Flags}),
+    {undefined, [], ConvertedFlags, []} = validate({Spec, Args, Flags, []}),
     ?assert(lists:member({node, 'dev2@127.0.0.1'}, ConvertedFlags)),
     ?assert(lists:member({force, undefined}, ConvertedFlags)).
 
@@ -314,7 +334,7 @@ validate_valid_long_flag_test() ->
     Args = [],
     Node = "dev2@127.0.0.1",
     Flags = [{node, Node}, {force, undefined}],
-    {undefined, [], ConvertedFlags} = validate({Spec, Args, Flags}),
+    {undefined, [], ConvertedFlags, []} = validate({Spec, Args, Flags, []}),
     ?assert(lists:member({node, 'dev2@127.0.0.1'}, ConvertedFlags)),
     ?assert(lists:member({force, undefined}, ConvertedFlags)).
 
@@ -325,17 +345,17 @@ validate_invalid_flags_test() ->
     InvalidFlags = [{'some-flag', Node},
                     {$b, Node},
                     {$a, undefined}],
-    [?assertMatch({error, _}, validate({Spec, Args, [F]})) || F <- InvalidFlags].
+    [?assertMatch({error, _}, validate({Spec, Args, [F], []})) || F <- InvalidFlags].
 
 validate_valid_args_test() ->
     Spec = spec(),
     Args = [{sample_size, "5"}],
-    {undefined, ConvertedArgs, []} = validate({Spec, Args, []}),
+    {undefined, ConvertedArgs, [], []} = validate({Spec, Args, [], []}),
     ?assertEqual(ConvertedArgs, [{sample_size, 5}]).
 
 validate_invalid_args_test() ->
     Spec = spec(),
     InvalidArgs = [{key, "value"}, {sample_size, "ayo"}],
-    [?assertMatch({error, _}, validate({Spec, [A], []})) || A <- InvalidArgs].
+    [?assertMatch({error, _}, validate({Spec, [A], [], []})) || A <- InvalidArgs].
 
 -endif.

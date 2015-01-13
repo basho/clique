@@ -47,8 +47,15 @@ register(Cmd, Keys, Flags, Fun) ->
          ({fun(), proplist(), proplist()})-> status().
 run({error, _}=E) ->
     E;
-run({Fun, Args, Flags}) ->
-    Fun(Args, Flags).
+run({Fun, Args, Flags, GlobalFlags}) ->
+    Format = proplists:get_value(format, GlobalFlags, "human"),
+    case proplists:is_defined(help, GlobalFlags) of
+        true ->
+            {usage, Format};
+        false ->
+            Result = Fun(Args, Flags),
+            {Result, Format}
+    end.
 
 -spec match([list()])-> {tuple(), list()} | {error, no_matching_spec}.
 match(Cmd0) ->
