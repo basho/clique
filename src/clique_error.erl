@@ -27,11 +27,12 @@
 
 -spec format(string(), err()) -> status().
 format(Cmd, {error, show_no_args}) ->
-    status(io_lib:format("Usage: ~ts show <variable> ...", [Cmd]));
+    status(io_lib:format("Usage: ~ts show <variable> ... [[--node | -n] <node> | --all]", [Cmd]));
 format(Cmd, {error, describe_no_args}) ->
     status(io_lib:format("Usage: ~ts describe <variable> ...", [Cmd]));
 format(Cmd, {error, set_no_args}) ->
-    status(io_lib:format("Usage: ~ts set <variable>=<value> ...", [Cmd]));
+    status(io_lib:format("Usage: ~ts set <variable>=<value> ... [[--node | -n] <node> | --all]",
+                         [Cmd]));
 format(_Cmd, {error, {no_matching_spec, Cmd}}) ->
     case clique_usage:find(Cmd) of
         {error, _} ->
@@ -60,9 +61,6 @@ format(_Cmd, {error, {invalid_flag_combination, Msg}}) ->
     status(io_lib:format("Error: ~ts", [Msg]));
 format(_Cmd, {error, {invalid_value, Val}}) ->
     status(io_lib:format("Invalid value: ~p", [Val]));
-format(Cmd, {error, {invalid_kv_arg, Arg}}) ->
-    status(io_lib:format(
-             "Usage: ~ts set ~ts=<value> ...", [Cmd, Arg]));
 format(_Cmd, {error, {too_many_equal_signs, Arg}}) ->
     status(io_lib:format("Too many equal signs in argument: ~p", [Arg]));
 format(_Cmd, {error, {invalid_config_keys, Invalid}}) ->

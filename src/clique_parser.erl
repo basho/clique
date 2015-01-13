@@ -77,8 +77,6 @@ parse_kv_args([Arg | Args], Acc) ->
     case string:tokens(Arg, "=") of
         [Key, Val] ->
             parse_kv_args(Args, [{list_to_atom(Key), Val} | Acc]);
-        [Key] ->
-            {error, {invalid_kv_arg, Key}};
         _ ->
             {error, {too_many_equal_signs, Arg}}
     end.
