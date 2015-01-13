@@ -120,12 +120,7 @@ describe(Args, _Flags) ->
 set(Args, Flags) ->
     M1 = get_config({Args, Flags}),
     M2 = set_config(M1),
-    case run_callback(M2) of
-        {error, _}=E ->
-            E;
-        _ ->
-            []
-    end.
+    run_callback(M2).
 
 %% @doc Whitelist settable cuttlefish variables. By default all variables are not settable.
 -spec whitelist([string()]) -> ok | {error, {invalid_config_keys, [string()]}}.
@@ -227,10 +222,10 @@ get_remote_env_status(EnvKeys, CuttlefishFlags) ->
 
 
 -spec run_callback(err()) -> err();
-                  ([{[string()], string()}]) -> ok | err().
+                  ([{[string()], string(), status()}]) -> status().
 run_callback({error, _}=E) ->
     E;
-run_callback({Args, Flags}) ->
+run_callback({Args, Flags, Status}) ->
     KVFuns = lists:foldl(fun({K, V}, Acc) ->
                              case ets:lookup(?config_table, K) of
                                  [{K, F}] ->
@@ -239,7 +234,8 @@ run_callback({Args, Flags}) ->
                                      Acc
                              end
                          end, [], Args),
-    [F(K, V, Flags) || {K, V, F} <- KVFuns].
+    _ = [F(K, V, Flags) || {K, V, F} <- KVFuns],
+    Status.
 
 -spec get_config(err()) -> err();
                 ({proplist(), flags()}) ->
@@ -259,7 +255,7 @@ get_config({Args, Flags}) ->
     end.
 
 -spec set_config(err()) -> err();
-      ({proplist(), proplist(), flags()}) -> {proplist(), flags()}| err().
+      ({proplist(), proplist(), flags()}) -> {proplist(), flags(), status()} | err().
 set_config({error, _}=E) ->
     E;
 set_config({AppConfig, Args, Flags}) ->
@@ -267,18 +263,19 @@ set_config({AppConfig, Args, Flags}) ->
     case check_keys_in_whitelist(Keys) of
         ok ->
             case set_app_config(AppConfig, Flags) of
-                ok ->
-                    {Args, Flags};
-                E ->
-                    E
+                {error, _} = E ->
+                    E;
+                 Status ->
+                    {Args, Flags, Status}
             end;
         {error, _}=E ->
             E
     end.
 
--spec set_app_config(proplist(), flags()) -> ok | err().
+-spec set_app_config(proplist(), flags()) -> status() | err().
 set_app_config(AppConfig, []) ->
-    set_local_app_config(AppConfig);
+    {ok, Status} = set_local_app_config(AppConfig),
+    Status;
 set_app_config(AppConfig, Flags) when length(Flags) =:= 1 ->
     [{Key, Val}] = Flags,
     case Key of
@@ -288,13 +285,16 @@ set_app_config(AppConfig, Flags) when length(Flags) =:= 1 ->
 set_app_config(_AppConfig, _Flags) ->
     app_config_flags_error().
 
--spec set_local_app_config(proplist()) -> ok.
+-spec set_local_app_config(proplist()) -> {ok, status()}.
 set_local_app_config(AppConfig) ->
     _ = [application:set_env(App, Key, Val) || {App, Settings} <- AppConfig,
                                                {Key, Val} <- Settings],
-    ok.
+    %% We return {ok, Status} instead of just Status so that we can more easily
+    %% differentiate a successful return from an RPC error when we call this
+    %% remotely.
+    {ok, []}.
 
--spec set_remote_app_config(proplist(), node()) -> ok.
+-spec set_remote_app_config(proplist(), node()) -> status() | err().
 set_remote_app_config(AppConfig, Node) ->
     Fun = set_local_app_config,
     case clique_nodes:safe_rpc(Node, ?MODULE, Fun, [AppConfig]) of
@@ -302,20 +302,29 @@ set_remote_app_config(AppConfig, Node) ->
             {error, {rpc_process_down, Node}};
         {badrpc, nodedown} ->
             {error, {nodedown, Node}};
-        ok ->
-            ok
+        {ok, Status} ->
+            Status
     end.
 
--spec set_remote_app_config(proplist()) -> ok.
+-spec set_remote_app_config(proplist()) -> status().
 set_remote_app_config(AppConfig) ->
+    %% TODO Convert this io:format to a status? Maybe better to keep it as
+    %% an io:format though, since then if the rpc:multicall takes a while,
+    %% the user can still see what we're currently trying to do instead of
+    %% getting no feedback?
     io:format("Setting config across the cluster~n", []),
     {_, Down} = rpc:multicall(clique_nodes:nodes(),
                               ?MODULE,
                               set_local_app_config,
                               [AppConfig],
                               60000),
-    (Down == []) orelse io:format("Failed to set config for: ~p~n", [Down]),
-    ok.
+    case Down of
+        [] ->
+            [];
+        _ ->
+            Alert = io_lib:format("Failed to set config for: ~p~n", [Down]),
+            [clique_status:alert([clique_status:text(Alert)])]
+    end.
 
 -spec config_flags() -> flags().
 config_flags() ->
