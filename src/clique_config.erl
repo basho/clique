@@ -24,10 +24,10 @@
          register/2,
          register_formatter/2,
          config_flags/0,
-         show/1,
+         show/2,
          set/2,
          whitelist/1,
-         describe/1,
+         describe/2,
          load_schema/1]).
 
 %% Callbacks for rpc calls
@@ -87,33 +87,28 @@ schema_paths(Directories) ->
                     Files ++ Acc
                 end, [], Directories).
 
--spec show([string()]) -> clique_status:status() | err().
-show(KeysAndFlags) ->
-    case get_valid_mappings(KeysAndFlags) of
+-spec show([string()], proplist()) -> clique_status:status() | err().
+show(Args, Flags) ->
+    case get_valid_mappings(Args) of
         {error, _}=E ->
             E;
-        {[], _Flags} ->
+        [] ->
             {error, show_no_args};
-        {KeyMappings, Flags0}->
+        KeyMappings ->
             EnvKeys = get_env_keys(KeyMappings),
             CuttlefishFlags = get_cuttlefish_flags(KeyMappings),
-            case clique_parser:validate_flags(config_flags(), Flags0) of
-                {error, _}=E ->
-                    E;
-                Flags ->
-                    get_env_status(EnvKeys, CuttlefishFlags, Flags)
-            end
+            get_env_status(EnvKeys, CuttlefishFlags, Flags)
     end.
 
--spec describe([string()]) -> clique_status:status() | err().
-describe(KeysAndFlags) ->
-    case get_valid_mappings(KeysAndFlags) of
+-spec describe([string()], proplist()) -> clique_status:status() | err().
+describe(Args, _Flags) ->
+    case get_valid_mappings(Args) of
         {error, _}=E ->
             E;
-        {[], _Flags} ->
+        [] ->
             {error, describe_no_args};
         %% TODO: Do we want to allow any flags? --verbose maybe?
-        {KeyMappings, _Flags0} ->
+        KeyMappings ->
             [begin
                  Doc = cuttlefish_mapping:doc(M),
                  Name = cuttlefish_variable:format(cuttlefish_mapping:variable(M)),
@@ -138,7 +133,7 @@ whitelist(Keys) ->
     case get_valid_mappings(Keys) of
         {error, _}=E ->
             E;
-        {_, _} ->
+        _ ->
             _ = [ets:insert(?whitelist_table, {Key}) || Key <- Keys],
             ok
     end.
@@ -336,10 +331,8 @@ config_flags() ->
                 "Apply the operation to all nodes in the cluster"}]}].
 
 
--spec get_valid_mappings([string()]) -> err() |
-                                        {[{string(), cuttlefish_mapping:mapping()}], flags()}.
-get_valid_mappings(KeysAndFlags) ->
-    {Keys0, Flags0} = lists:splitwith(fun clique_parser:is_not_flag/1, KeysAndFlags),
+-spec get_valid_mappings([string()]) -> err() | [{string(), cuttlefish_mapping:mapping()}].
+get_valid_mappings(Keys0) ->
     Keys = [cuttlefish_variable:tokenize(K) || K <- Keys0],
     [{schema, Schema}] = ets:lookup(?schema_table, schema),
     {_Translations, Mappings0, _Validators} = Schema,
@@ -350,12 +343,7 @@ get_valid_mappings(KeysAndFlags) ->
             Invalid = invalid_keys(Keys, KeyMappings),
             {error, {invalid_config_keys, Invalid}};
         true ->
-            case clique_parser:parse_flags(Flags0) of
-                {error, _}=E ->
-                    E;
-                Flags ->
-                    {KeyMappings, Flags}
-            end
+            KeyMappings
     end.
 
 -spec valid_mappings([cuttlefish_variable:variable()], [cuttlefish_mapping:mapping()]) ->

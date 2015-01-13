@@ -97,10 +97,6 @@ print(Status, _Cmd, Format) ->
 
 %% @doc Run a config operation or command
 -spec run([string()]) -> ok | {error, term()}.
-run([_Script, "show" | Args] = Cmd) ->
-    print(clique_config:show(Args), Cmd);
-run([_Script, "describe" | Args] = Cmd) ->
-    print(clique_config:describe(Args), Cmd);
 run(Cmd0) ->
     {GlobalFlags, Cmd} = extract_global_flags(Cmd0),
     case proplists:get_bool(help, GlobalFlags) of

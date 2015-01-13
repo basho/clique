@@ -57,6 +57,12 @@ match(Cmd0) ->
     case Cmd of
         [_Script, "set" | _] ->
             {?SET_CMD_SPEC, Args};
+        [_Script, "show" | _] ->
+            Spec = cmd_spec(Cmd, fun clique_config:show/2, clique_config:config_flags()),
+            {Spec, Args};
+        [_Script, "describe" | _] ->
+            Spec = cmd_spec(Cmd, fun clique_config:describe/2, []),
+            {Spec, Args};
         _ ->
             case ets:lookup(?cmd_table, Cmd) of
                 [Spec] ->
@@ -73,3 +79,13 @@ split_command(Cmd0) ->
                         clique_parser:is_not_flag(Str)
                     end, Cmd0).
 
+%% NB This is a bit sneaky. We normally only accept key/value args like
+%% "handoff.inbound=off" and flag-style arguments like "--node dev1@127.0.0.1" or "--all",
+%% but the builtin "show" and "describe" commands work a bit differently.
+%% To handle these special cases, we dynamically build a command spec to smuggle the
+%% arguments through the rest of the (otherwise cleanly designed and implemented) code.
+cmd_spec(Cmd, CmdFun, AllowedFlags) ->
+    [_Script, _CmdName | CfgKeys] = Cmd,
+    %% Discard key/val args passed in since we don't need them, and inject the freeform args:
+    SpecFun = fun([], Flags) -> CmdFun(CfgKeys, Flags) end,
+    {Cmd, [], AllowedFlags, SpecFun}.
