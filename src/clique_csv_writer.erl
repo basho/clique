@@ -72,7 +72,9 @@ format_val(V) when is_integer(V) ->
 format_val(V) when is_binary(V) ->
     format_val(unicode:characters_to_list(V, utf8));
 format_val(Str0) when is_list(Str0) ->
-    Str = string:strip(Str0),
+    %% TODO: This could probably be done more efficiently.
+    %% Maybe we could write a strip func that works directly on iolists?
+    Str = string:strip(binary_to_list(iolist_to_binary(Str0))),
     %% If we have any line breaks, double quotes, or commas, we must surround the value with
     %% double quotes.
     IsEvilChar = fun(C) -> lists:member(C, [$\r, $\n, $", $,]) end,
