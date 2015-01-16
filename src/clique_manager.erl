@@ -42,6 +42,7 @@ start_link() ->
 %% messages, it can only die if explicitly killed.
 %%
 init([]) ->
+    ok = clique_writer:init(),
     ok = clique_command:init(),
     ok = clique_usage:init(),
     ok = clique_config:init(),

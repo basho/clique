@@ -5,7 +5,7 @@
 %% csv and a subset of html, as well as other possible output.
 -type text() :: {text, iolist()}.
 -type status_list() :: {list, iolist(), [iolist()]} | {list, [iolist()]}.
--type table() :: {table, [{iolist(), iolist()}]}.
+-type table() :: {table, [[{atom() | string(), term()}]]}.
 -type alert() :: {alert, [status_list() | table() | text()]}.
 -type usage() :: usage.
 -type elem() :: text() | status_list() | table() | alert() | usage().

@@ -47,6 +47,15 @@ register(Cmd, Usage) ->
     ets:insert(?usage_table, {Cmd, Usage}).
 
 -spec print(iolist()) -> ok.
+print(Cmd = [Script, "describe" | _]) ->
+    Usage = clique_error:format(Script, {error, describe_no_args}),
+    clique:print(Usage, Cmd);
+print(Cmd = [Script, "show" | _]) ->
+    Usage = clique_error:format(Script, {error, show_no_args}),
+    clique:print(Usage, Cmd);
+print(Cmd = [Script, "set" | _]) ->
+    Usage = clique_error:format(Script, {error, set_no_args}),
+    clique:print(Usage, Cmd);
 print(Cmd) ->
     Usage = case find(Cmd) of
                 {error, Error} ->

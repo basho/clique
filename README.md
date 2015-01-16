@@ -30,7 +30,7 @@ Clique provides the application developer with the following capabilities:
    configuration across one or all nodes: i.e.  `riak-admin set anti-entropy=on --all`
  * Return a standard status format that allows output of a variety of content
    types: human-readable, csv, html, etc... (Note that currently only
-   human-readable output is implemented)
+   human-readable and CSV output formats are implemented)
 
 ### Why Not Clique ?
  * You aren't writing a CLI
@@ -308,6 +308,19 @@ clique:register_usage(["riak-admin", "handoff"], handoff_usage()),
 %% Register a callback for dynamic output:
 clique:register_usage(["riak-admin", "handoff", "limit"], fun handoff_limit_usage/0).
 ```
+
+### register_writer/2
+This is not something most applications will likely need to use, but the
+capability exists to create custom output writer modules. Currently you can
+specify the `--format=[human|csv]` flag on many commands to determine how the
+output will be written; registering a new writer "foo" allows you to use
+`--format=foo` to write the output using whatever corresponding writer module
+you've registered.
+
+Writing custom output writers is relatively undocumented right now, and the
+values passed to the `write/1` callback may be subject to future changes. But,
+the `clique_*_writer` modules in the clique source tree provide good examples
+that can be used for reference.
 
 ### run/1
 `run/1` takes a given command as a list of strings and attempts to run the

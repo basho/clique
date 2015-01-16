@@ -32,6 +32,8 @@
 -type proplist() :: [{atom(), term()}].
 -type status() :: clique_status:status().
 
+-define(SET_CMD_SPEC, {["_", "set"], '_', clique_config:config_flags(), fun clique_config:set/2}).
+
 init() ->
     _ = ets:new(?cmd_table, [public, named_table]),
     ok.
@@ -45,17 +47,36 @@ register(Cmd, Keys, Flags, Fun) ->
          ({fun(), proplist(), proplist()})-> status().
 run({error, _}=E) ->
     E;
-run({Fun, Args, Flags}) ->
-    Fun(Args, Flags).
+run({Fun, Args, Flags, GlobalFlags}) ->
+    Format = proplists:get_value(format, GlobalFlags, "human"),
+    case proplists:is_defined(help, GlobalFlags) of
+        true ->
+            {usage, Format};
+        false ->
+            Result = Fun(Args, Flags),
+            {Result, Format}
+    end.
 
 -spec match([list()])-> {tuple(), list()} | {error, no_matching_spec}.
 match(Cmd0) ->
     {Cmd, Args} = split_command(Cmd0),
-    case ets:lookup(?cmd_table, Cmd) of
-        [Spec] ->
+    %% Check for builtin commands first. If that fails, check our command table.
+    case Cmd of
+        [_Script, "set" | _] ->
+            {?SET_CMD_SPEC, Args};
+        [_Script, "show" | _] ->
+            Spec = cmd_spec(Cmd, fun clique_config:show/2, clique_config:config_flags()),
             {Spec, Args};
-        [] ->
-            {error, {no_matching_spec, Cmd0}}
+        [_Script, "describe" | _] ->
+            Spec = cmd_spec(Cmd, fun clique_config:describe/2, []),
+            {Spec, Args};
+        _ ->
+            case ets:lookup(?cmd_table, Cmd) of
+                [Spec] ->
+                    {Spec, Args};
+                [] ->
+                    {error, {no_matching_spec, Cmd0}}
+            end
     end.
 
 -spec split_command([list()]) -> {list(), list()}.
@@ -65,3 +86,13 @@ split_command(Cmd0) ->
                         clique_parser:is_not_flag(Str)
                     end, Cmd0).
 
+%% NB This is a bit sneaky. We normally only accept key/value args like
+%% "handoff.inbound=off" and flag-style arguments like "--node dev1@127.0.0.1" or "--all",
+%% but the builtin "show" and "describe" commands work a bit differently.
+%% To handle these special cases, we dynamically build a command spec to smuggle the
+%% arguments through the rest of the (otherwise cleanly designed and implemented) code.
+cmd_spec(Cmd, CmdFun, AllowedFlags) ->
+    [_Script, _CmdName | CfgKeys] = Cmd,
+    %% Discard key/val args passed in since we don't need them, and inject the freeform args:
+    SpecFun = fun([], Flags) -> CmdFun(CfgKeys, Flags) end,
+    {Cmd, [], AllowedFlags, SpecFun}.
