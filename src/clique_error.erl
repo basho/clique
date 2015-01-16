@@ -81,7 +81,11 @@ format(_Cmd, {error, {config_not_settable, Keys}}) ->
 format(_Cmd, {error, {nodedown, Node}}) ->
     status(io_lib:format("Target node is down: ~p~n", [Node]));
 format(_Cmd, {error, bad_node}) ->
-    status("Invalid node name").
+    status("Invalid node name");
+format(_Cmd, {error, {conversion, _}}=TypeError) ->
+    %% Type-conversion error originating in cuttlefish
+    status(cuttlefish_error:xlate(TypeError)).
+
 
 -spec status(string()) -> status().
 status(Str) ->
