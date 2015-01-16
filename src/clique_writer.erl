@@ -43,7 +43,8 @@
 %% TODO factor err type out into single clique:err() type - DRY!
 -type err() :: {error, term()}.
 
--callback write(status()) -> iolist().
+%% First element of the return value is for stdout, second is stderr
+-callback write(status()) -> {iolist(), iolist()}.
 
 -spec init() -> ok.
 init() ->
@@ -55,13 +56,13 @@ init() ->
 register(Name, Module) ->
     ets:insert(?writer_table, {Name, Module}).
 
--spec write(err() | clique_status:status(), string()) -> iolist().
+-spec write(err() | clique_status:status(), string()) -> {iolist(), iolist()}.
 write(Status, Format) ->
     case ets:lookup(?writer_table, Format) of
         [{Format, Module}] ->
             Module:write(Status);
         [] ->
             Error = io_lib:format("Invalid format ~p! Defaulted to human-readable.~n", [Format]),
-            Output = clique_human_writer:write(Status),
-            [Output, "\n", Error]
+            {Stdout, Stderr} = clique_human_writer:write(Status),
+            {Stdout, [Stderr, "\n", Error]}
     end.

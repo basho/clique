@@ -96,8 +96,16 @@ print({error, _}=E, Cmd, Format) ->
     Alert = clique_error:format(hd(Cmd), E),
     print(Alert, Cmd, Format);
 print(Status, _Cmd, Format) ->
-    Output = clique_writer:write(Status, Format),
-    io:format("~ts", [Output]).
+    {Stdout, Stderr} = clique_writer:write(Status, Format),
+    %% This is kind of a hack, but I'm not aware of a better way to do this.
+    %% When the RPC call is executed, it replaces the group_leader with that
+    %% of the calling process, so that stdout is automatically redirected to
+    %% the caller. However, stderr is not. To get the correct PID for stderr,
+    %% we need to do an RPC back to the calling node and get it from them.
+    CallingNode = node(group_leader()),
+    RemoteStderr = rpc:call(CallingNode, erlang, whereis, [standard_error]),
+    io:format("~ts", [Stdout]),
+    io:format(RemoteStderr, "~ts", [Stderr]).
 
 %% @doc Run a config operation or command
 -spec run([string()]) -> ok | {error, term()}.
