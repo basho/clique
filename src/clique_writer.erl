@@ -61,6 +61,7 @@ write(Status, Format) ->
         [{Format, Module}] ->
             Module:write(Status);
         [] ->
-            io:format("Invalid format ~p! Defaulting to human-readable:~n", [Format]),
-            clique_human_writer:write(Status)
+            Error = io_lib:format("Invalid format ~p! Defaulted to human-readable.~n", [Format]),
+            Output = clique_human_writer:write(Status),
+            [Output, "\n", Error]
     end.
