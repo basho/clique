@@ -30,7 +30,7 @@ Clique provides the application developer with the following capabilities:
    configuration across one or all nodes: i.e.  `riak-admin set anti-entropy=on --all`
  * Return a standard status format that allows output of a variety of content
    types: human-readable, csv, html, etc... (Note that currently only
-   human-readable and CSV output formats are implemented)
+   human-readable, CSV, and JSON output formats are implemented)
 
 ### Why Not Clique ?
  * You aren't writing a CLI
@@ -312,14 +312,19 @@ clique:register_usage(["riak-admin", "handoff", "limit"], fun handoff_limit_usag
 ### register_writer/2
 This is not something most applications will likely need to use, but the
 capability exists to create custom output writer modules. Currently you can
-specify the `--format=[human|csv]` flag on many commands to determine how the
-output will be written; registering a new writer "foo" allows you to use
+specify the `--format=[human|csv|json]` flag on many commands to determine how
+the output will be written; registering a new writer "foo" allows you to use
 `--format=foo` to write the output using whatever corresponding writer module
 you've registered.
 
+(Note that the JSON writer is a special case, in that it is only available if
+the mochijson2 module is present at startup. We wanted to avoid having to
+introduce MochiWeb as a hard dependency, so instead we allow users of Clique to
+decide for themselves if/how they want to include the mochijson2 module.)
+
 Writing custom output writers is relatively undocumented right now, and the
 values passed to the `write/1` callback may be subject to future changes. But,
-the `clique_*_writer` modules in the clique source tree provide good examples
+the `clique_*_writer` modules in the Clique source tree provide good examples
 that can be used for reference.
 
 ### run/1
