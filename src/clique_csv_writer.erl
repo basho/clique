@@ -30,10 +30,16 @@
 
 -include("clique_status_types.hrl").
 
--spec write(status()) -> iolist().
+-spec write(status()) -> {iolist(), iolist()}.
 write(Status) ->
-    Output = clique_status:parse(Status, fun write_status/2, []),
-    lists:reverse(Output).
+    %% First, pull out any alerts so that we can feed them
+    %% to the human writer and print them out on stderr:
+    {Alerts, NonAlerts} = lists:partition(fun({alert, _}) -> true;
+                                             (_) -> false
+                                          end, Status),
+    Output = clique_status:parse(NonAlerts, fun write_status/2, []),
+    AlertOutput = [element(1, clique_human_writer:write(A)) || {alert, A} <- Alerts],
+    {lists:reverse(Output), AlertOutput}.
 
 %% @doc Write status information in csv format.
 %%
