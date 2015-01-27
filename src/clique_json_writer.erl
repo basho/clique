@@ -49,10 +49,10 @@
                   alert_list=[] :: [elem()],
                   output=[] :: iolist()}).
 
--spec write(status()) -> iolist().
+-spec write(status()) -> {iolist(), iolist()}.
 write(Status) ->
     PreparedOutput = lists:reverse(prepare(Status)),
-    [mochijson2:encode(PreparedOutput), "\n"].
+    {[mochijson2:encode(PreparedOutput), "\n"], []}.
 
 %% @doc Returns status data that's been prepared for conversion to JSON.
 %% Just reverse the list and pass it to mochijson2:encode and you're set.
