@@ -91,7 +91,9 @@ resize_row(MaxLength, Widths) ->
     Sum = lists:sum(Widths),
     case Sum > MaxLength of
 	true ->
-	    resize_items(Sum, MaxLength, Widths);
+	    NewWidths = resize_items(Sum, MaxLength, Widths),
+	    % go around again, just in case some columns were unshrinkable
+	    resize_row(MaxLength, NewWidths);
 	false ->
 	    Widths
     end.
@@ -121,7 +123,13 @@ reduce_widths(PerColumn, Total, Widths) ->
 				{0, [Width | NewWidths]};
 			    _ ->
 				Rem = Remaining - PerColumn,
-				{Rem, [Width - PerColumn | NewWidths]}
+				%% don't allow negative column widths
+				NewWidth = case Width - PerColumn of
+				               Int when Int < 0 ->
+				                   Width;
+				               X -> X
+				           end,
+				{Rem, [NewWidth | NewWidths]}
 			end
 		    end, {Total, []}, Widths),
     NewWidths.
