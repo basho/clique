@@ -18,6 +18,7 @@
 %%
 %% -------------------------------------------------------------------
 -module(clique_command).
+-include("clique_specs.hrl").
 
 -define(cmd_table, clique_commands).
 
@@ -40,7 +41,9 @@ init() ->
 
 %% @doc Register a cli command (i.e.: "riak-admin handoff status")
 -spec register([string()], list(), list(), fun()) -> true.
-register(Cmd, Keys, Flags, Fun) ->
+register(Cmd, Keys0, Flags0, Fun) ->
+    Keys = make_specs(Keys0),
+    Flags = make_specs(Flags0),
     ets:insert(?cmd_table, {Cmd, Keys, Flags, Fun}).
 
 -spec run(err()) -> err();
@@ -85,6 +88,11 @@ split_command(Cmd0) ->
                         clique_parser:is_not_kv_arg(Str) andalso
                         clique_parser:is_not_flag(Str)
                     end, Cmd0).
+
+
+-spec make_specs([{atom(), proplist()}]) -> [spec()].
+make_specs(Specs) ->
+    [ clique_spec:make(Spec) || Spec <- Specs ].
 
 %% NB This is a bit sneaky. We normally only accept key/value args like
 %% "handoff.inbound=off" and flag-style arguments like "--node dev1@127.0.0.1" or "--all",

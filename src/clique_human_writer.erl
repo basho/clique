@@ -33,10 +33,10 @@
 -record(context, {alert_set=false :: boolean(),
                   output="" :: iolist()}).
 
--spec write(status()) -> iolist().
+-spec write(status()) -> {iolist(), iolist()}.
 write(Status) ->
     Ctx = clique_status:parse(Status, fun write_status/2, #context{}),
-    Ctx#context.output.
+    {Ctx#context.output, []}.
 
 %% @doc Write status information in console format.
 -spec write_status(elem(), #context{}) -> #context{}.

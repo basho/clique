@@ -18,6 +18,7 @@
 %%
 %% -------------------------------------------------------------------
 -module(clique_config).
+-include("clique_specs.hrl").
 
 %% API
 -export([init/0,
@@ -43,7 +44,9 @@
 -type err() :: {error, term()}.
 -type status() :: clique_status:status().
 -type proplist() :: [{atom(), term()}].
--type flags() :: [{atom() | char(), term()}].
+-type flagspecs() :: [spec()].
+-type flags() :: proplist().
+-type args() :: clique_parser:args().
 
 -type envkey() :: {string(), {atom(), atom()}}.
 -type cuttlefish_flag_spec() :: {flag, atom(), atom()}.
@@ -238,7 +241,7 @@ run_callback({Args, Flags, Status}) ->
     Status.
 
 -spec get_config(err()) -> err();
-                ({proplist(), flags()}) ->
+                ({args(), flags()}) ->
                     {proplist(), proplist(), flags()} | err().
 get_config({error, _}=E) ->
     E;
@@ -246,7 +249,7 @@ get_config({[], _Flags}) ->
     {error, set_no_args};
 get_config({Args, Flags}) ->
     [{schema, Schema}] = ets:lookup(?schema_table, schema),
-    Conf = [{cuttlefish_variable:tokenize(atom_to_list(K)), V} || {K, V} <- Args],
+    Conf = [{cuttlefish_variable:tokenize(K), V} || {K, V} <- Args],
     case cuttlefish_generator:minimal_map(Schema, Conf) of
         {error, _, Msg} ->
             {error, {invalid_config, Msg}};
@@ -326,18 +329,18 @@ set_remote_app_config(AppConfig) ->
             [clique_status:alert([clique_status:text(Alert)])]
     end.
 
--spec config_flags() -> flags().
+-spec config_flags() -> flagspecs().
 config_flags() ->
-    [{node, [{shortname, "n"},
-             {longname, "node"},
-             {typecast, fun clique_typecast:to_node/1},
-             {description,
-                 "The node to apply the operation on"}]},
+    [clique_spec:make({node, [{shortname, "n"},
+                              {longname, "node"},
+                              {typecast, fun clique_typecast:to_node/1},
+                              {description,
+                               "The node to apply the operation on"}]}),
 
-     {all, [{shortname, "a"},
-            {longname, "all"},
-            {description,
-                "Apply the operation to all nodes in the cluster"}]}].
+     clique_spec:make({all, [{shortname, "a"},
+                             {longname, "all"},
+                             {description,
+                              "Apply the operation to all nodes in the cluster"}]})].
 
 
 -spec get_valid_mappings([string()]) -> err() | [{string(), cuttlefish_mapping:mapping()}].
