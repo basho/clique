@@ -122,7 +122,7 @@ parse_flags([Val | _T], [], _Acc) ->
 
 %% TODO: If this gets more complicated, write out a function to extract
 %% the flag names from ?GFLAG_SPECS instead of hand-coding it in ?GLOBAL_FLAGS
--define(GLOBAL_FLAGS, [$h, help, format]).
+-define(GLOBAL_FLAGS, [$h, "help", "format"]).
 -define(GFLAG_SPECS, [clique_spec:make({help, [{shortname, "h"},
                                                {longname, "help"}]}),
                       clique_spec:make({format, [{longname, "format"}]})]).
