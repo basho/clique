@@ -124,7 +124,7 @@ reduce_widths(PerColumn, Total, Widths) ->
 				{Rem, [Width - PerColumn | NewWidths]}
 			end
 		    end, {Total, []}, Widths),
-    NewWidths.
+    lists:reverse(NewWidths).
 
 get_row_length(Spec, Rows) ->
     Res = lists:foldl(fun({_Name, MinSize}, Total) ->
