@@ -22,7 +22,8 @@
 
 %% API
 -export([print/2, print/3,
-         create_table/2, autosize_create_table/2]).
+         create_table/2,
+         autosize_create_table/2, autosize_create_table/3]).
 
 -include("clique_status_types.hrl").
 
@@ -48,13 +49,18 @@ print(Header, Spec, Rows) ->
 
 -spec autosize_create_table([any()], [[any()]]) -> iolist().
 autosize_create_table(Schema, Rows) ->
+    autosize_create_table(Schema, Rows, []).
+
+-spec autosize_create_table([any()], [[any()]], [tuple()]) -> iolist().
+autosize_create_table(Schema, Rows, Constraints) ->
     BorderSize = 1 + length(hd(Rows)),
     MaxLineLen = case io:columns() of
 	             %% Leaving an extra space seems to work better
 	             {ok, N} -> N - 1;
 		     {error, enotsup} -> ?MAX_LINE_LEN
 		 end,
-    Sizes = get_field_widths(MaxLineLen - BorderSize, [Schema | Rows]),
+    Sizes = get_field_widths(MaxLineLen - BorderSize, [Schema | Rows],
+                            proplists:get_value(fixed_width, Constraints, [])),
     Spec = lists:zip(Schema, Sizes),
     create_table(Spec, Rows, MaxLineLen, []).
 
@@ -81,50 +87,64 @@ create_table(Spec, [], _Length, IoList) ->
 create_table(Spec, [Row | Rows], Length, IoList) ->
     create_table(Spec, Rows, Length, [row(Spec, Row) | IoList]).
 
--spec get_field_widths(pos_integer(), [term()]) ->  [pos_integer()].
-get_field_widths(MaxLineLen, Rows) ->
+-spec get_field_widths(pos_integer(), [term()], [non_neg_integer()]) ->  [non_neg_integer()].
+get_field_widths(MaxLineLen, Rows, Unshrinkable) ->
     Widths = max_widths(Rows),
-    resize_row(MaxLineLen, Widths).
+    strip_fields(MaxLineLen, Widths, Unshrinkable).
 
--spec resize_row(pos_integer(), [pos_integer()]) -> [pos_integer()].
-resize_row(MaxLength, Widths) ->
+strip_fields(MaxWidth, Widths, Unshrinkable) ->
     Sum = lists:sum(Widths),
-    case Sum > MaxLength of
-	true ->
-	    resize_items(Sum, MaxLength, Widths);
-	false ->
-	    Widths
-    end.
+    Weights = calculate_field_weights(Sum, Widths, Unshrinkable),
+    MustRemove = Sum - MaxWidth,
+    new_widths(MaxWidth, MustRemove, Widths, Weights).
 
--spec resize_items(pos_integer(), pos_integer(), [pos_integer()]) ->
-    [pos_integer()].
-resize_items(Sum, MaxLength, Widths) ->
-    Diff = Sum - MaxLength,
-    NumColumns = length(Widths),
-    case NumColumns > Diff of
-	true ->
-	    Remaining = NumColumns - Diff ,
-	    reduce_widths(1, Remaining, Widths);
-	false ->
-	    PerColumn = Diff div NumColumns + 1,
-	    Remaining = Diff - NumColumns,
-	    reduce_widths(PerColumn, Remaining, Widths)
-    end.
--spec reduce_widths(pos_integer(), pos_integer(), [pos_integer()]) ->
-    [pos_integer()].
-reduce_widths(PerColumn, Total, Widths) ->
-    %% Just subtract one character from each column until we run out.
+calculate_field_weights(Sum, Widths, []) ->
+    lists:map(fun(X) -> X / Sum end, Widths);
+calculate_field_weights(_Sum, Widths, Unshrinkable) ->
+    %% Any column numbers represented in `Unshrinkable' will be given
+    %% a weight of 0 and all other weights will be correspondingly
+    %% higher
+    NewWidths = flag_unshrinkable_widths(Widths, Unshrinkable),
+    NewSum = lists:sum(lists:filter(fun({_X, noshrink}) -> false;
+                                       (_X) -> true end,
+                                    NewWidths)),
+    lists:map(fun({_X, noshrink}) -> 0;
+                 (X) -> X / NewSum end,
+              NewWidths).
+
+flag_unshrinkable_widths(Widths, NoShrink) ->
     {_, NewWidths} =
-        lists:foldl(fun(Width, {Remaining, NewWidths}) ->
-		        case Remaining of
-			    0 ->
-				{0, [Width | NewWidths]};
-			    _ ->
-				Rem = Remaining - PerColumn,
-				{Rem, [Width - PerColumn | NewWidths]}
-			end
-		    end, {Total, []}, Widths),
+        lists:foldl(fun(X, {Idx, Mapped}) ->
+                            case lists:member(Idx, NoShrink) of
+                                true ->
+                                    {Idx + 1, [{X, noshrink}|Mapped]};
+                                false ->
+                                    {Idx + 1, [X|Mapped]}
+                            end
+                    end, {0, []}, Widths),
     lists:reverse(NewWidths).
+
+new_widths(_Max, ToNarrow, Widths, _Weights) when ToNarrow =< 0 ->
+    Widths;
+new_widths(MaxWidth, ToNarrow, Widths, Weights) ->
+    tweak_widths(MaxWidth,
+                 lists:map(fun({Width, Weight}) ->
+                                   Width - round(ToNarrow * Weight)
+                           end,
+                           lists:zip(Widths, Weights))).
+
+%% Rounding may introduce an error. If so, remove the requisite number
+%% of spaces from the widest field
+tweak_widths(Target, Widths) ->
+    tweak_if_necessary(Target, lists:sum(Widths), lists:max(Widths), Widths).
+
+tweak_if_necessary(Target, Current, _Widest, Widths) when Target =< Current ->
+    Widths;
+tweak_if_necessary(Target, Current, Widest, Widths) ->
+    Gap = Current - Target,
+    lists:map(fun(X) when X =:= Widest -> X - Gap;
+                 (X) -> X
+              end, Widths).
 
 get_row_length(Spec, Rows) ->
     Res = lists:foldl(fun({_Name, MinSize}, Total) ->
