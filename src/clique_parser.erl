@@ -432,7 +432,7 @@ arg_datatype_test() ->
     ?assertEqual(ConvertedArgs, [{sample_size, 10}]),
 
     InvalidTypeArg = [{"sample_size", "A"}],
-    ?assertMatch({error, {conversion, _}}, validate({Spec, InvalidTypeArg, [], []})).
+    ?assertMatch({error, _}, validate({Spec, InvalidTypeArg, [], []})).
 
 arg_validation_test() ->
     Spec = dt_validate_spec(),
