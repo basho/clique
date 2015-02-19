@@ -28,6 +28,13 @@
 -include("clique_status_types.hrl").
 
 -define(MAX_LINE_LEN, 100).
+-define(else, true).
+-define(MINWIDTH(W),
+        if W =< 0 ->
+                1;
+           ?else ->
+                W
+        end).
 
 -spec print(list(), list()) -> ok.
 print(_Spec, []) ->
@@ -55,12 +62,12 @@ autosize_create_table(Schema, Rows) ->
 autosize_create_table(Schema, Rows, Constraints) ->
     BorderSize = 1 + length(hd(Rows)),
     MaxLineLen = case io:columns() of
-	             %% Leaving an extra space seems to work better
-	             {ok, N} -> N - 1;
-		     {error, enotsup} -> ?MAX_LINE_LEN
-		 end,
+                     %% Leaving an extra space seems to work better
+                     {ok, N} -> N - 1;
+                     {error, enotsup} -> ?MAX_LINE_LEN
+                 end,
     Sizes = get_field_widths(MaxLineLen - BorderSize, [Schema | Rows],
-                            proplists:get_value(fixed_width, Constraints, [])),
+                             proplists:get_value(fixed_width, Constraints, [])),
     Spec = lists:zip(Schema, Sizes),
     create_table(Spec, Rows, MaxLineLen, []).
 
@@ -124,31 +131,62 @@ flag_unshrinkable_widths(Widths, NoShrink) ->
                     end, {0, []}, Widths),
     lists:reverse(NewWidths).
 
+column_zip(Widths, Weights, ToNarrow) ->
+    column_zip(Widths, Weights, ToNarrow, 0, []).
+
+column_zip([], [], _ToNarrow, _Index, Accum) ->
+    lists:reverse(Accum);
+column_zip([Width|Widths], [Weight|Weights], ToNarrow, Index, Accum) ->
+    NewWidth = ?MINWIDTH(Width - round(ToNarrow * Weight)),
+    column_zip(Widths, Weights, ToNarrow, Index+1,
+               [{NewWidth, Weight, Index}] ++ Accum).
+
 new_widths(_Max, ToNarrow, Widths, _Weights) when ToNarrow =< 0 ->
     Widths;
 new_widths(MaxWidth, ToNarrow, Widths, Weights) ->
-    tweak_widths(MaxWidth,
-                 lists:map(fun({Width, Weight}) ->
-                                   Width - round(ToNarrow * Weight)
-                           end,
-                           lists:zip(Widths, Weights))).
+    tweak_widths(MaxWidth, column_zip(Widths, Weights, ToNarrow)).
 
 %% Rounding may introduce an error. If so, remove the requisite number
 %% of spaces from the widest field
-tweak_widths(Target, Widths) ->
-    tweak_if_necessary(Target, lists:sum(Widths), lists:max(Widths), Widths).
+tweak_widths(Target, Cols) ->
+    Widths = lists:map(fun({Width, _Weight, _Idx}) -> Width end,
+                       Cols),
+    SumWidths = lists:sum(Widths),
+    shrink_widest(Target, SumWidths, Widths, Cols).
 
-tweak_if_necessary(Target, Current, _Widest, Widths) when Target =< Current ->
+%% If our target table width is narrower than our calculated width,
+%% look for the widest column with a non-zero weight (zero weights are
+%% constrained to not be narrowed) and shrink it by the necessary
+%% value.
+shrink_widest(Target, Current, Widths, _Cols) when Target =< Current ->
     Widths;
-tweak_if_necessary(Target, Current, Widest, Widths) ->
+shrink_widest(Target, Current, Widths, Cols) ->
     Gap = Current - Target,
-    lists:map(fun(X) when X =:= Widest -> X - Gap;
-                 (X) -> X
-              end, Widths).
+    NonZeroWeighted = lists:dropwhile(fun({_Width, 0, _Idx}) -> true;
+                                         (_) -> false end,
+                                      Cols),
+    shrink_nonzero_widest(Gap, NonZeroWeighted, Widths).
+
+
+shrink_nonzero_widest(_Gap, [], Widths) ->
+    Widths; %% All columns constrained to fixed widths, nothing we can do
+shrink_nonzero_widest(Gap, Cols, Widths) ->
+    SortedCols = lists:sort(
+                   fun({WidthA, _WeightA, _IdxA}, {WidthB, _WeightB, _IdxB}) ->
+                           WidthA > WidthB
+                   end, Cols),
+    {OldWidth, _Weight, Idx} = hd(SortedCols),
+    NewWidth = ?MINWIDTH(OldWidth - Gap),
+    replace_list_element(Idx, NewWidth, Widths).
+
+%% Zero-based indexing. Deal with it
+replace_list_element(Index, Element, List) ->
+    {Prefix, Suffix} = lists:split(Index, List),
+    Prefix ++ [Element] ++ tl(Suffix).
 
 get_row_length(Spec, Rows) ->
     Res = lists:foldl(fun({_Name, MinSize}, Total) ->
-			Longest = find_longest_field(Rows, length(Total)+1),
+                        Longest = find_longest_field(Rows, length(Total)+1),
                         Size = erlang:max(MinSize, Longest),
                         [Size | Total]
                 end, [], Spec),
@@ -157,9 +195,9 @@ get_row_length(Spec, Rows) ->
 -spec find_longest_field(list(), pos_integer()) -> non_neg_integer().
 find_longest_field(Rows, ColumnNo) ->
         lists:foldl(fun(Row, Longest) ->
-		        erlang:max(Longest,
-			          field_length(lists:nth(ColumnNo,Row)))
-		    end, 0, Rows).
+                        erlang:max(Longest,
+                                  field_length(lists:nth(ColumnNo,Row)))
+                    end, 0, Rows).
 
 -spec max_widths([term()]) -> list(pos_integer()).
 max_widths([Row]) ->
@@ -167,9 +205,9 @@ max_widths([Row]) ->
 max_widths([Row1 | Rest]) ->
     Row1Lengths = field_lengths(Row1),
     lists:foldl(fun(Row, Acc) ->
-		    Lengths = field_lengths(Row),
-		    [max(A, B) || {A, B} <- lists:zip(Lengths, Acc)]
-		end, Row1Lengths, Rest).
+                    Lengths = field_lengths(Row),
+                    [max(A, B) || {A, B} <- lists:zip(Lengths, Acc)]
+                end, Row1Lengths, Rest).
 
 -spec row(list(), list(string())) -> iolist().
 row(Spec, Row0) ->
