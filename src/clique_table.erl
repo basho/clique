@@ -58,6 +58,9 @@ print(Header, Spec, Rows) ->
 autosize_create_table(Schema, Rows) ->
     autosize_create_table(Schema, Rows, []).
 
+%% Currently the only constraint supported in the proplist is
+%% `fixed_width' with a list of columns that *must not* be shrunk
+%% (e.g., integer values). First column is 0.
 -spec autosize_create_table([any()], [[any()]], [tuple()]) -> iolist().
 autosize_create_table(Schema, Rows, Constraints) ->
     BorderSize = 1 + length(hd(Rows)),
@@ -94,31 +97,40 @@ create_table(Spec, [], _Length, IoList) ->
 create_table(Spec, [Row | Rows], Length, IoList) ->
     create_table(Spec, Rows, Length, [row(Spec, Row) | IoList]).
 
+%% Measure and shrink table width as necessary to fit the console
 -spec get_field_widths(pos_integer(), [term()], [non_neg_integer()]) ->  [non_neg_integer()].
 get_field_widths(MaxLineLen, Rows, Unshrinkable) ->
     Widths = max_widths(Rows),
-    strip_fields(MaxLineLen, Widths, Unshrinkable).
+    fit_widths_to_terminal(MaxLineLen, Widths, Unshrinkable).
 
-strip_fields(MaxWidth, Widths, Unshrinkable) ->
+fit_widths_to_terminal(MaxWidth, Widths, Unshrinkable) ->
     Sum = lists:sum(Widths),
     Weights = calculate_field_weights(Sum, Widths, Unshrinkable),
     MustRemove = Sum - MaxWidth,
-    new_widths(MaxWidth, MustRemove, Widths, Weights).
+    calculate_new_widths(MaxWidth, MustRemove, Widths, Weights).
 
+%% Determine field weighting as proportion of total width of the
+%% table. Fields which were flagged as unshrinkable will be given a
+%% weight of 0.
+-spec calculate_field_weights(pos_integer(), list(pos_integer()),
+                              list(non_neg_integer())) ->
+                                     list(number()).
 calculate_field_weights(Sum, Widths, []) ->
+    %% If no fields are constrained as unshrinkable, simply divide
+    %% each width by the sum of all widths for our proportions
     lists:map(fun(X) -> X / Sum end, Widths);
 calculate_field_weights(_Sum, Widths, Unshrinkable) ->
-    %% Any column numbers represented in `Unshrinkable' will be given
-    %% a weight of 0 and all other weights will be correspondingly
-    %% higher
-    NewWidths = flag_unshrinkable_widths(Widths, Unshrinkable),
-    NewSum = lists:sum(lists:filter(fun({_X, noshrink}) -> false;
-                                       (_X) -> true end,
-                                    NewWidths)),
+    TaggedWidths = flag_unshrinkable_widths(Widths, Unshrinkable),
+    ShrinkableWidth = lists:sum(lists:filter(fun({_X, noshrink}) -> false;
+                                                (_X) -> true end,
+                                             TaggedWidths)),
     lists:map(fun({_X, noshrink}) -> 0;
-                 (X) -> X / NewSum end,
-              NewWidths).
+                 (X) -> X / ShrinkableWidth end,
+              TaggedWidths).
 
+%% Takes a list of column widths and a list of (zero-based) index
+%% values of the columns that must not shrink. Returns a mixed list of
+%% widths and `noshrink' tuples.
 flag_unshrinkable_widths(Widths, NoShrink) ->
     {_, NewWidths} =
         lists:foldl(fun(X, {Idx, Mapped}) ->
@@ -131,6 +143,8 @@ flag_unshrinkable_widths(Widths, NoShrink) ->
                     end, {0, []}, Widths),
     lists:reverse(NewWidths).
 
+%% Calculate the proportional weight for each column for shrinking.
+%% Zip the results into a `{Width, Weight, Index}' tuple list.
 column_zip(Widths, Weights, ToNarrow) ->
     column_zip(Widths, Weights, ToNarrow, 0, []).
 
@@ -141,23 +155,24 @@ column_zip([Width|Widths], [Weight|Weights], ToNarrow, Index, Accum) ->
     column_zip(Widths, Weights, ToNarrow, Index+1,
                [{NewWidth, Weight, Index}] ++ Accum).
 
-new_widths(_Max, ToNarrow, Widths, _Weights) when ToNarrow =< 0 ->
+%% Given the widths based on data to be displayed, return widths
+%% necessary to narrow the table to fit the console.
+calculate_new_widths(_Max, ToNarrow, Widths, _Weights) when ToNarrow =< 0 ->
+    %% Console is wide enough, no need to narrow
     Widths;
-new_widths(MaxWidth, ToNarrow, Widths, Weights) ->
-    tweak_widths(MaxWidth, column_zip(Widths, Weights, ToNarrow)).
+calculate_new_widths(MaxWidth, ToNarrow, Widths, Weights) ->
+    fix_rounding(MaxWidth, column_zip(Widths, Weights, ToNarrow)).
 
 %% Rounding may introduce an error. If so, remove the requisite number
 %% of spaces from the widest field
-tweak_widths(Target, Cols) ->
+fix_rounding(Target, Cols) ->
     Widths = lists:map(fun({Width, _Weight, _Idx}) -> Width end,
                        Cols),
     SumWidths = lists:sum(Widths),
     shrink_widest(Target, SumWidths, Widths, Cols).
 
-%% If our target table width is narrower than our calculated width,
-%% look for the widest column with a non-zero weight (zero weights are
-%% constrained to not be narrowed) and shrink it by the necessary
-%% value.
+%% Determine whether our target table width is wider than the terminal
+%% due to any rounding error and find columns eligible to be shrunk.
 shrink_widest(Target, Current, Widths, _Cols) when Target =< Current ->
     Widths;
 shrink_widest(Target, Current, Widths, Cols) ->
@@ -165,12 +180,13 @@ shrink_widest(Target, Current, Widths, Cols) ->
     NonZeroWeighted = lists:dropwhile(fun({_Width, 0, _Idx}) -> true;
                                          (_) -> false end,
                                       Cols),
-    shrink_nonzero_widest(Gap, NonZeroWeighted, Widths).
+    shrink_widest_weighted(Gap, NonZeroWeighted, Widths).
 
-
-shrink_nonzero_widest(_Gap, [], Widths) ->
+%% Take the widest column with a non-zero weight and reduce it by the
+%% amount necessary to compensate for any rounding error.
+shrink_widest_weighted(_Gap, [], Widths) ->
     Widths; %% All columns constrained to fixed widths, nothing we can do
-shrink_nonzero_widest(Gap, Cols, Widths) ->
+shrink_widest_weighted(Gap, Cols, Widths) ->
     SortedCols = lists:sort(
                    fun({WidthA, _WeightA, _IdxA}, {WidthB, _WeightB, _IdxB}) ->
                            WidthA > WidthB
@@ -179,7 +195,9 @@ shrink_nonzero_widest(Gap, Cols, Widths) ->
     NewWidth = ?MINWIDTH(OldWidth - Gap),
     replace_list_element(Idx, NewWidth, Widths).
 
-%% Zero-based indexing. Deal with it
+%% Replace the item at `Index' in `List' with `Element'.
+%% Zero-based indexing.
+-spec replace_list_element(non_neg_integer(), term(), list()) -> list().
 replace_list_element(Index, Element, List) ->
     {Prefix, Suffix} = lists:split(Index, List),
     Prefix ++ [Element] ++ tl(Suffix).
