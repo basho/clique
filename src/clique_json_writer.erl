@@ -65,8 +65,6 @@ prepare(Status) ->
 prepare_status(alert, Ctx=#context{alert_set=true}) ->
     %% TODO: Should we just return an error instead?
     throw({error, nested_alert, Ctx});
-prepare_status(Term, Ctx=#context{alert_set=true, alert_list=AList}) ->
-    Ctx#context{alert_list=[Term | AList]};
 prepare_status(alert, Ctx) ->
     Ctx#context{alert_set=true};
 prepare_status(alert_done, Ctx = #context{alert_list=AList, output=Output}) ->
@@ -74,6 +72,8 @@ prepare_status(alert_done, Ctx = #context{alert_list=AList, output=Output}) ->
     AlertJsonVal = prepare(AList),
     AlertJson = {struct, [{<<"type">>, <<"alert">>}, {<<"alert">>, AlertJsonVal}]},
     Ctx#context{alert_set=false, alert_list=[], output=[AlertJson | Output]};
+prepare_status(Term, Ctx=#context{alert_set=true, alert_list=AList}) ->
+    Ctx#context{alert_list=[Term | AList]};
 prepare_status({list, Data}, Ctx=#context{output=Output}) ->
     Ctx#context{output=[prepare_list(Data) | Output]};
 prepare_status({list, Title, Data}, Ctx=#context{output=Output}) ->
