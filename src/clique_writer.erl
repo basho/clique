@@ -50,6 +50,14 @@
 init() ->
     _ = ets:new(?writer_table, [public, named_table]),
     ets:insert(?writer_table, ?BUILTIN_WRITERS),
+    %% We don't want to make mochiweb into a hard dependency, so only load
+    %% the JSON writer if we have the mochijson2 module available:
+    case code:which(mochijson2) of
+        non_existing ->
+            ok;
+        _ ->
+            ets:insert(?writer_table, {"json", clique_json_writer})
+    end,
     ok.
 
 -spec register(string(), module()) -> true.
