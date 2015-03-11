@@ -29,6 +29,9 @@
 
 -type err() :: {error, term()}.
 -type usage_function() :: fun(() -> iolist()).
+-type usage() :: iolist() | usage_function().
+
+-export_type([usage/0]).
 
 %% API
 -export([init/0,
@@ -42,7 +45,7 @@ init() ->
 
 %% @doc Register usage for a given command sequence. Lookups are by longest
 %% match.
--spec register([string()], iolist() | usage_function()) -> true.
+-spec register([string()], usage()) -> true.
 register(Cmd, Usage) ->
     ets:insert(?usage_table, {Cmd, Usage}).
 

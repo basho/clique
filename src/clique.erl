@@ -76,7 +76,7 @@ register_command(Cmd, Keys, Flags, Fun) ->
 
 %% @doc Register usage for a given command sequence. Lookups are by longest
 %% match.
--spec register_usage([string()], iolist()) -> true.
+-spec register_usage([string()], clique_usage:usage()) -> true.
 register_usage(Cmd, Usage) ->
     clique_usage:register(Cmd, Usage).
 
