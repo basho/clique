@@ -22,6 +22,7 @@
 %% @doc Write status information in JSON format.
 %%
 %% The current clique -> JSON translation looks something like this:
+%% ```
 %% {text, "hello world"} ->
 %%     {"type" : "text", "text" : "hello world"}
 %% {text, [<<he>>, $l, "lo", ["world"]]} ->
@@ -38,6 +39,7 @@
 %% {table, [[{name, "Nick"}, {species, "human"}], [{name, "Rowlf"}, {species, "dog"}]]} ->
 %%     {"type" : "table",
 %%      "table" : [{"name" : "Nick", "species" : "human"}, {"name", "Rowlf", "species", "dog"}]}
+%% '''
 
 -behavior(clique_writer).
 
