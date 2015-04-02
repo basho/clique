@@ -1,5 +1,25 @@
+%% -------------------------------------------------------------------
+%%
+%% Copyright (c) 2015 Basho Technologies, Inc.
+%%
+%% This file is provided to you under the Apache License,
+%% Version 2.0 (the "License"); you may not use this file
+%% except in compliance with the License.  You may obtain
+%% a copy of the License at
+%%
+%%   http://www.apache.org/licenses/LICENSE-2.0
+%%
+%% Unless required by applicable law or agreed to in writing,
+%% software distributed under the License is distributed on an
+%% "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+%% KIND, either express or implied.  See the License for the
+%% specific language governing permissions and limitations
+%% under the License.
+%%
 %% @doc Implements an io server that can be used as a group leader in
 %% testing, and supports changing the size of the io device.
+%% -------------------------------------------------------------------
+
 -module(clique_test_group_leader).
 
 -export([new_group_leader/0,
@@ -155,25 +175,7 @@ io_requests(_, Result) ->
     Result.
 
 -ifdef(TEST).
--define(GL(T),
-        begin
-            Res = setup(),
-            try
-                T
-            after
-                cleanup(Res)
-            end
-        end).
-
-setup() ->
-    OldLeader = group_leader(),
-    Leader = new_group_leader(),
-    {OldLeader, Leader}.
-
-cleanup({OldLeader, Leader}) ->
-    group_leader(OldLeader, self()),
-    io:format("CAPTURED: ~s", [get_output(Leader)]),
-    stop(Leader).
+-include("clique_test_group_leader.hrl").
 
 leader_test_() ->
      [
@@ -183,7 +185,7 @@ leader_test_() ->
      ].
 
 test_capture() ->
-    ?GL(begin
+    ?TEST_GROUP_LEADER(begin
             ?assertEqual(ok, io:put_chars(<<"line 1\n">>)),
             ?assertEqual(ok, io:put_chars(<<"line 2\n">>)),
             ?assertEqual([<<"line 1\n">>,<<"line 2\n">>],
@@ -191,7 +193,7 @@ test_capture() ->
         end).
 
 test_set_size() ->
-    ?GL(begin
+    ?TEST_GROUP_LEADER(begin
             ?assertEqual({ok, 80}, io:columns()),
             ?assertEqual({ok, 20}, io:rows()),
             set_size(group_leader(), 202, 29),
@@ -200,7 +202,7 @@ test_set_size() ->
         end).
 
 test_no_input() ->
-    ?GL(begin
+    ?TEST_GROUP_LEADER(begin
             ?assertEqual(ok, io:put_chars(<<"line 1\n">>)),
             ?assertEqual(eof, io:get_chars("> ", 10))
         end).

@@ -27,6 +27,10 @@
 
 -include("clique_status_types.hrl").
 
+-ifdef(TEST).
+-include_lib("eunit/include/eunit.hrl").
+-endif.
+
 -define(MAX_LINE_LEN, 100).
 -define(else, true).
 -define(MINWIDTH(W),
@@ -98,7 +102,7 @@ create_table(Spec, [Row | Rows], Length, IoList) ->
     create_table(Spec, Rows, Length, [row(Spec, Row) | IoList]).
 
 %% Measure and shrink table width as necessary to fit the console
--spec get_field_widths(pos_integer(), [term()], [non_neg_integer()]) ->  [non_neg_integer()].
+-spec get_field_widths(pos_integer(), [term()], [non_neg_integer()]) -> [non_neg_integer()].
 get_field_widths(MaxLineLen, Rows, Unshrinkable) ->
     Widths = max_widths(Rows),
     fit_widths_to_terminal(MaxLineLen, Widths, Unshrinkable).
@@ -309,3 +313,70 @@ pad_field(Field, MaxHeight) when length(Field) < MaxHeight ->
     Field ++ ["" || _ <- lists:seq(1, MaxHeight - length(Field))];
 pad_field(Field, _MaxHeight) ->
     Field.
+
+-ifdef(TEST).
+-include("clique_test_group_leader.hrl").
+
+table_size_test_() ->
+    [
+        {"try a table with an empty row", fun test_empty_row/0},
+        {"try a table with a row less than the size of screen", fun test_short_row/0},
+        {"try a table with a row greater than the size of the screen", fun test_long_row/0},
+        {"try a table with a row with mixed values", fun test_mixed_row/0},
+        {"try a table with a row equal to the size of the screen", fun test_equal_row/0}
+    ].
+
+test_empty_row() ->
+    ?TEST_GROUP_LEADER(begin
+        ?assertError(function_clause, autosize_create_table([<<"One Column">>], [[]]))
+    end).
+
+test_short_row() ->
+    ?TEST_GROUP_LEADER(begin
+        Result = autosize_create_table([<<"One Column">>], [["A single row"]]),
+        ?assertEqual(Result, [[43,[["------------",43]],10],
+            [124," One Column |","\n"],
+            [43,[["------------",43]],10],
+            [[124,"A single row|","\n"]],
+            [43,[["------------",43]],10]])
+    end).
+
+test_long_row() ->
+    ?TEST_GROUP_LEADER(begin
+        clique_test_group_leader:set_size(group_leader(), 20, 10),
+        Result = autosize_create_table([<<"One Column">>],
+                                      [[lists:flatten(lists:duplicate(?MAX_LINE_LEN*2,"x"))]]),
+        ?assertEqual(Result, [[43,[["-----------------",43]],10],
+            [124,"   One Column    |","\n"],
+            [43,[["-----------------",43]],10],
+            [[124,"xxxxxxxxxxxxxxxxx|","\n"]],
+            [43,[["-----------------",43]],10]])
+    end).
+
+test_mixed_row() ->
+    ?TEST_GROUP_LEADER(begin
+        clique_test_group_leader:set_size(group_leader(), 20, 10),
+        Result = autosize_create_table([<<"One Column">>],
+            [[["SinkNode1LeaderRejoin",32,61,32,"undefined",32,105,115,32,110,111,116,
+                32,101,113,117,97,108,32,116,111,32,101,120,112,101,99,116,101,100,32,
+                118,97,108,117,101,32,"'dev4@127.0.0.1'",32,97,116,32,108,105,110,101,
+                32,"990"]]]),
+        ?assertEqual(Result,[[43,[["-----------------",43]],10],
+            [124,"   One Column    |","\n"],
+            [43,[["-----------------",43]],10],
+            [[124,"SinkNode1LeaderRe|","\n"]],
+            [43,[["-----------------",43]],10]])
+    end).
+
+test_equal_row() ->
+    ?TEST_GROUP_LEADER(begin
+        clique_test_group_leader:set_size(group_leader(), 20, 10),
+        Result = autosize_create_table([<<"One Column">>],
+           [[lists:flatten(lists:duplicate(?MAX_LINE_LEN,"x"))]]),
+        ?assertEqual(Result, [[43,[["-----------------",43]],10],
+           [124,"   One Column    |","\n"],
+           [43,[["-----------------",43]],10],
+           [[124,"xxxxxxxxxxxxxxxxx|","\n"]],
+           [43,[["-----------------",43]],10]])
+    end).
+-endif.
