@@ -141,11 +141,11 @@ extract_global_flags({Spec, Args, Flags0}) ->
 
 -spec validate(err()) -> err();
               ({tuple(), args(), flags(), flags()}) ->
-                      err() | {fun(), proplist(), proplist(), flags()}.
+                      err() | {fun(), [string()], proplist(), proplist(), flags()}.
 validate({error, _}=E) ->
     E;
 validate({Spec, Args0, Flags0, GlobalFlags}) ->
-    {_Cmd, KeySpecs, FlagSpecs, Callback} = Spec,
+    {Cmd, KeySpecs, FlagSpecs, Callback} = Spec,
     case validate_args(KeySpecs, Args0) of
         {error, _}=E ->
             E;
@@ -154,7 +154,7 @@ validate({Spec, Args0, Flags0, GlobalFlags}) ->
                 {error, _}=E ->
                     E;
                 Flags ->
-                    {Callback, Args, Flags, GlobalFlags}
+                    {Callback, Cmd, Args, Flags, GlobalFlags}
             end
     end.
 

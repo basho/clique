@@ -47,16 +47,16 @@ register(Cmd, Keys0, Flags0, Fun) ->
     ets:insert(?cmd_table, {Cmd, Keys, Flags, Fun}).
 
 -spec run(err()) -> err();
-         ({fun(), proplist(), proplist()})-> status().
+         ({fun(), [string()], proplist(), proplist()})-> status().
 run({error, _}=E) ->
     E;
-run({Fun, Args, Flags, GlobalFlags}) ->
+run({Fun, Cmd, Args, Flags, GlobalFlags}) ->
     Format = proplists:get_value(format, GlobalFlags, "human"),
     case proplists:is_defined(help, GlobalFlags) of
         true ->
             {usage, Format};
         false ->
-            Result = Fun(Args, Flags),
+            Result = Fun(Cmd, Args, Flags),
             {Result, Format}
     end.
 
