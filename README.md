@@ -251,7 +251,7 @@ FlagSpecs = [{node, [{shortname, "n"},
 %%
 %% This pattern matching works here because we know we only allow one flag in
 %% the flagspec, and the callback only ever fires with valid flags.
-Callback = fun([]=_Keys, [{node, Node}]=_Flags) ->
+Callback = fun(["riak-admin", "handoff", "limit"]=_Cmd, []=_Keys, [{node, Node}]=_Flags) ->
                case clique_nodes:safe_rpc(Node, somemod, somefun, []) of
                    {error, _} ->
                        Text = clique_status:text("Failed to Do Something"),
@@ -267,6 +267,30 @@ Callback = fun([]=_Keys, [{node, Node}]=_Flags) ->
 
 clique:register_command(Cmd, KeySpecs, FlagSpecs, Callback).
 ```
+
+#### Command Wildcards
+Users can also use the '*' atom any number of times at the end of a command spec
+to indicate wildcard fields in the command. This is useful for simple commands that
+always requires certain arguments in a clear concise order. For instance, the command
+`riak-admin cluster join <node>` always requires a node name to be specified,
+and it would be cumbersome and redundant if a user had to type
+`riak-admin cluster join --node=<node>` instead. However, it is recommended that this
+feature be used sparingly, and only in cases with a small number of arguments that are
+always specified in a clear, obvious order. Too many free-form arguments can impair usability,
+and can lead to situations where it's easy to forget the command format or to specify the
+arguments in the wrong order.
+
+When a command is run, it will try to match the exact command spec first, and then look for
+progressively fuzzier matches using wildcards, working from the end of the command backward.
+For example, if the user runs registers commands for `["my-cmd", "foo", "bar"]`,
+`["my-cmd", "foo", '*']`, and `["my-cmd", '*', '*']`, then running "my-cmd foo bar" will always
+match the first spec, "my-cmd foo blub" will match the second spec, and "my-cmd baz blub" will
+match the final spec.
+
+The existence of wildcards is the sole reason that the user-inputted command strings are passed
+to the callback. If a command is registered without wildcards, the the same command will always
+be passed to the callback function, and so that particular argument can be ignored (as it was
+in the example above).
 
 ### register_usage/2
 We want to show usage explicitly in many cases, and not with the `--help` flag.
