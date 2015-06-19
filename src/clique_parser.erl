@@ -388,19 +388,21 @@ parse_valueless_flags_test() ->
 
 validate_valid_short_flag_test() ->
     Spec = spec(),
+    Cmd = element(1, Spec),
     Args = [],
     Node = "dev2@127.0.0.1",
     Flags = [{$n, Node}, {$f, undefined}],
-    {undefined, [], ConvertedFlags, []} = validate({Spec, Args, Flags, []}),
+    {undefined, Cmd, [], ConvertedFlags, []} = validate({Spec, Args, Flags, []}),
     ?assert(lists:member({node, 'dev2@127.0.0.1'}, ConvertedFlags)),
     ?assert(lists:member({force, undefined}, ConvertedFlags)).
 
 validate_valid_long_flag_test() ->
     Spec = spec(),
+    Cmd = element(1, Spec),
     Args = [],
     Node = "dev2@127.0.0.1",
     Flags = [{"node", Node}, {"force", undefined}],
-    {undefined, [], ConvertedFlags, []} = validate({Spec, Args, Flags, []}),
+    {undefined, Cmd, [], ConvertedFlags, []} = validate({Spec, Args, Flags, []}),
     ?assert(lists:member({node, 'dev2@127.0.0.1'}, ConvertedFlags)),
     ?assert(lists:member({force, undefined}, ConvertedFlags)).
 
@@ -415,8 +417,9 @@ validate_invalid_flags_test() ->
 
 validate_valid_args_test() ->
     Spec = spec(),
+    Cmd = element(1, Spec),
     Args = [{"sample_size", "5"}],
-    {undefined, ConvertedArgs, [], []} = validate({Spec, Args, [], []}),
+    {undefined, Cmd, ConvertedArgs, [], []} = validate({Spec, Args, [], []}),
     ?assertEqual(ConvertedArgs, [{sample_size, 5}]).
 
 validate_invalid_args_test() ->
@@ -427,8 +430,9 @@ validate_invalid_args_test() ->
 
 arg_datatype_test() ->
     Spec = dt_validate_spec(),
+    Cmd = element(1, Spec),
     ValidArg = [{"sample_size", "10"}],
-    {undefined, ConvertedArgs, [], []} = validate({Spec, ValidArg, [], []}),
+    {undefined, Cmd, ConvertedArgs, [], []} = validate({Spec, ValidArg, [], []}),
     ?assertEqual(ConvertedArgs, [{sample_size, 10}]),
 
     InvalidTypeArg = [{"sample_size", "A"}],
@@ -441,8 +445,9 @@ arg_validation_test() ->
 
 flag_datatype_test() ->
     Spec = dt_validate_spec(),
+    Cmd = element(1, Spec),
     ValidFlag = [{$n, "a@dev1"}],
-    {undefined, _, Flags, []} = validate({Spec, [], ValidFlag, []}),
+    {undefined, Cmd, [], Flags, []} = validate({Spec, [], ValidFlag, []}),
     ?assertEqual([{node, 'a@dev1'}], Flags),
 
     InvalidFlag = [{"node", "someothernode@foo.bar"}],
