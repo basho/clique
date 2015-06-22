@@ -40,11 +40,32 @@ init() ->
     ok.
 
 %% @doc Register a cli command (i.e.: "riak-admin handoff status")
--spec register(['*' | string()], list(), list(), fun()) -> true.
+-spec register(['*' | string()], list(), list(), fun()) -> ok | {error, atom()}.
 register(Cmd, Keys0, Flags0, Fun) ->
-    Keys = make_specs(Keys0),
-    Flags = make_specs(Flags0),
-    ets:insert(?cmd_table, {Cmd, Keys, Flags, Fun}).
+    case verify_register(Cmd) of
+        ok ->
+            Keys = make_specs(Keys0),
+            Flags = make_specs(Flags0),
+            ets:insert(?cmd_table, {Cmd, Keys, Flags, Fun}),
+            ok;
+        {error, Err} ->
+            error_logger:info_report([{warning, "Clique command registration failed"},
+                                      {reason, Err},
+                                      {command, Cmd},
+                                      {keys, Keys0},
+                                      {flags, Flags0}]),
+            {error, Err}
+    end.
+
+verify_register(Cmd) ->
+    %% Only thing we currently verify is whether any/all wildcard '*' atoms are grouped at the end
+    CmdTail = lists:dropwhile(fun(E) -> E =/= '*' end, Cmd),
+    case lists:any(fun(E) -> E =/= '*' end, CmdTail) of
+        true ->
+            {error, bad_wildcard_placement};
+        false ->
+            ok
+    end.
 
 -spec run(err()) -> err();
          ({fun(), [string()], proplist(), proplist()})-> status().
