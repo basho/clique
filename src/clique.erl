@@ -69,8 +69,8 @@ register_writer(Name, Module) ->
 register_config_whitelist(SettableKeys) ->
     clique_config:whitelist(SettableKeys).
 
-%% @doc Register a cli command (i.e.: "riak-admin handoff status")
--spec register_command([string()], list(), list(), fun()) -> true.
+%% @doc Register a cli command (e.g.: "riak-admin handoff status", or "riak-admin cluster join '*'")
+-spec register_command(['*' | string()], list(), list(), fun()) -> ok | {error, atom()}.
 register_command(Cmd, Keys, Flags, Fun) ->
     clique_command:register(Cmd, Keys, Flags, Fun).
 
