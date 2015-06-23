@@ -292,6 +292,13 @@ to the callback. If a command is registered without wildcards, the the same comm
 be passed to the callback function, and so that particular argument can be ignored (as it was
 in the example above).
 
+#### Wildcard Keyspecs
+Specifying keyspecs for a command has the advantage of doing type conversions and automatically
+recognizing if particular keys are valid or not. However, in some cases users may wish to allow
+any and all key/value pairs through to the callback. To achieve this, an '_' atom can be used
+as a keyspec, and all key=value pairs will be passed to the command callback in a list of type
+`[{string(), string()}]`.
+
 ### register_usage/2
 We want to show usage explicitly in many cases, and not with the `--help` flag.
 To make this easier, the user must explicitly register usage points. If one of

@@ -40,11 +40,14 @@ init() ->
     ok.
 
 %% @doc Register a cli command (i.e.: "riak-admin handoff status")
--spec register(['*' | string()], list(), list(), fun()) -> ok | {error, atom()}.
+-spec register(['*' | string()], '_' | list(), list(), fun()) -> ok | {error, atom()}.
 register(Cmd, Keys0, Flags0, Fun) ->
     case verify_register(Cmd) of
         ok ->
-            Keys = make_specs(Keys0),
+            Keys = case Keys0 of
+                       '_' -> '_';
+                       _ -> make_specs(Keys0)
+                   end,
             Flags = make_specs(Flags0),
             ets:insert(?cmd_table, {Cmd, Keys, Flags, Fun}),
             ok;
