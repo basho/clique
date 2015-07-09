@@ -33,7 +33,10 @@
 -type proplist() :: [{atom(), term()}].
 -type status() :: clique_status:status().
 
--define(SET_CMD_SPEC, {["_", "set"], '_', clique_config:config_flags(), fun clique_config:set/2}).
+-define(SET_CMD_SPEC, {["_", "set"], '_', clique_config:config_flags(),
+                       fun (_, Args, Flags) ->
+                               clique_config:set(Args, Flags)
+                       end}).
 
 init() ->
     _ = ets:new(?cmd_table, [public, named_table]),
