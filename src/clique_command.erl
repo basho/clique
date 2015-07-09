@@ -151,5 +151,5 @@ make_specs(Specs) ->
 cmd_spec(Cmd, CmdFun, AllowedFlags) ->
     [_Script, _CmdName | CfgKeys] = Cmd,
     %% Discard key/val args passed in since we don't need them, and inject the freeform args:
-    SpecFun = fun([], Flags) -> CmdFun(CfgKeys, Flags) end,
+    SpecFun = fun(_, [], Flags) -> CmdFun(CfgKeys, Flags) end,
     {Cmd, [], AllowedFlags, SpecFun}.
