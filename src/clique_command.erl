@@ -34,8 +34,8 @@
 -type status() :: clique_status:status().
 
 -define(SET_CMD_SPEC, {["_", "set"], '_', clique_config:config_flags(),
-                       fun (_, Args, Flags) ->
-                               clique_config:set(Args, Flags)
+                       fun (_, SetArgs, SetFlags) ->
+                               clique_config:set(SetArgs, SetFlags)
                        end}).
 
 init() ->
