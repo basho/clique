@@ -35,8 +35,8 @@ format(Cmd, {error, set_no_args}) ->
                          [Cmd]));
 format(_Cmd, {error, {no_matching_spec, Cmd}}) ->
     case clique_usage:find(Cmd) of
-        {error, _} ->
-            status(io_lib:format("Invalid command '~ts'", [Cmd]));
+        {error, ErrorString} ->
+            status(ErrorString);
         Usage ->
             status(io_lib:format("~ts", [Usage]))
     end;
