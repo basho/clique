@@ -33,7 +33,10 @@
 -type proplist() :: [{atom(), term()}].
 -type status() :: clique_status:status().
 
--define(SET_CMD_SPEC, {["_", "set"], '_', clique_config:config_flags(), fun clique_config:set/2}).
+-define(SET_CMD_SPEC, {["_", "set"], '_', clique_config:config_flags(),
+                       fun (_, SetArgs, SetFlags) ->
+                               clique_config:set(SetArgs, SetFlags)
+                       end}).
 
 init() ->
     _ = ets:new(?cmd_table, [public, named_table]),
@@ -151,5 +154,5 @@ make_specs(Specs) ->
 cmd_spec(Cmd, CmdFun, AllowedFlags) ->
     [_Script, _CmdName | CfgKeys] = Cmd,
     %% Discard key/val args passed in since we don't need them, and inject the freeform args:
-    SpecFun = fun([], Flags) -> CmdFun(CfgKeys, Flags) end,
+    SpecFun = fun(_, [], Flags) -> CmdFun(CfgKeys, Flags) end,
     {Cmd, [], AllowedFlags, SpecFun}.
