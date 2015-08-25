@@ -6,7 +6,9 @@
   {registered, []},
   {applications, [
                   kernel,
-                  stdlib
+                  stdlib,
+                  cuttlefish,
+                  webmachine
                  ]},
   {mod, {clique_app, []}},
   {env, []}
