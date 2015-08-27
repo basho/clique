@@ -75,17 +75,21 @@ verify_register(Cmd) ->
 
 -spec run(err()) -> err();
          ({fun(), [string()], clique_parser:args(), clique_parser:flags(),
-               clique_parser:flags()}) -> {usage | status(), string()}.
+               clique_parser:flags()}) -> {usage | status(), integer(), string()}.
 run({error, _}=E) ->
     E;
 run({Fun, Cmd, Args, Flags, GlobalFlags}) ->
     Format = proplists:get_value(format, GlobalFlags, "human"),
     case proplists:is_defined(help, GlobalFlags) of
         true ->
-            {usage, Format};
+            {usage, 0, Format};
         false ->
-            Result = Fun(Cmd, Args, Flags),
-            {Result, Format}
+            case Fun(Cmd, Args, Flags) of
+                {Result, ExitStatus} ->
+                    {Result, ExitStatus, Format};
+                Result ->
+                    {Result, 0, Format}
+            end
     end.
 
 -spec match([list()])-> {tuple(), list()} | {error, no_matching_spec}.

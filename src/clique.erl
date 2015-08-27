@@ -81,15 +81,23 @@ register_usage(Cmd, Usage) ->
     clique_usage:register(Cmd, Usage).
 
 %% @doc Take a list of status types and generate console output
--spec print(err() | clique_status:status() | {clique_status:status(), string()}, [string()]) -> ok.
+-spec print(err() | clique_status:status() | {clique_status:status(), integer(), string()},
+            [string()]) -> ok.
 print({error, _} = E, Cmd) ->
-    print(E, Cmd, "human");
-print({Status, Format}, Cmd) ->
-    print(Status, Cmd, Format);
+    print(E, Cmd, "human"),
+    {error, 1};
+print({Status, ExitCode, Format}, Cmd) ->
+    print(Status, Cmd, Format),
+    case ExitCode of
+        0 -> ok;
+        _ -> {error, ExitCode}
+    end;
 print(Status, Cmd) ->
-    print(Status, Cmd, "human").
+    print(Status, Cmd, "human"),
+    ok.
 
--spec print(usage | err() | clique_status:status(), [string()], string()) -> ok.
+-spec print(usage | err() | clique_status:status(), [string()], string()) ->
+    ok | {error, integer()}.
 print(usage, Cmd, _Format) ->
     clique_usage:print(Cmd);
 print({error, _}=E, Cmd, Format) ->
@@ -108,7 +116,7 @@ print(Status, _Cmd, Format) ->
     io:format(RemoteStderr, "~ts", [Stderr]).
 
 %% @doc Run a config operation or command
--spec run([string()]) -> ok.
+-spec run([string()]) -> ok | {error, integer()}.
 run(Cmd) ->
     M0 = clique_command:match(Cmd),
     M1 = clique_parser:parse(M0),
