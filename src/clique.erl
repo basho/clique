@@ -108,7 +108,7 @@ print(Status, _Cmd, Format) ->
     io:format(RemoteStderr, "~ts", [Stderr]).
 
 %% @doc Run a config operation or command
--spec run([string()]) -> ok | {error, term()}.
+-spec run([string()]) -> ok.
 run(Cmd) ->
     M0 = clique_command:match(Cmd),
     M1 = clique_parser:parse(M0),
