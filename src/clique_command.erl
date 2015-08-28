@@ -87,6 +87,8 @@ run({Fun, Cmd, Args, Flags, GlobalFlags}) ->
             case Fun(Cmd, Args, Flags) of
                 {exit_status, ExitStatus, Result} ->
                     {Result, ExitStatus, Format};
+                Error = {error, _} ->
+                    {Error, 1, Format};
                 Result ->
                     {Result, 0, Format}
             end
