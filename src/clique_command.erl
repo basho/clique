@@ -75,7 +75,7 @@ verify_register(Cmd) ->
 
 -spec run(err()) -> err();
          ({fun(), [string()], clique_parser:args(), clique_parser:flags(),
-               clique_parser:flags()}) -> {usage | status(), integer(), string()}.
+               clique_parser:flags()}) -> {usage | {error, term()} | status(), integer(), string()}.
 run({error, _}=E) ->
     E;
 run({Fun, Cmd, Args, Flags, GlobalFlags}) ->
