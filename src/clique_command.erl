@@ -85,7 +85,7 @@ run({Fun, Cmd, Args, Flags, GlobalFlags}) ->
             {usage, 0, Format};
         false ->
             case Fun(Cmd, Args, Flags) of
-                {Result, ExitStatus} ->
+                {exit_status, ExitStatus, Result} ->
                     {Result, ExitStatus, Format};
                 Result ->
                     {Result, 0, Format}
