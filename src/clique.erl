@@ -81,8 +81,9 @@ register_usage(Cmd, Usage) ->
     clique_usage:register(Cmd, Usage).
 
 %% @doc Take a list of status types and generate console output
--spec print(err() | clique_status:status() | {clique_status:status(), integer(), string()},
-            [string()]) -> ok.
+-spec print({error, term()}, term()) -> {error, 1};
+           ({clique_status:status(), integer(), string()}, [string()]) -> ok | {error, integer()};
+           (clique_status:status(), [string()]) -> ok.
 print({error, _} = E, Cmd) ->
     print(E, Cmd, "human"),
     {error, 1};
