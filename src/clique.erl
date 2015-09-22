@@ -137,7 +137,7 @@ basic_cmd_test() ->
     Callback = fun(CallbackCmd, [], []) ->
                        ?assertEqual(Cmd, CallbackCmd),
                        put(pass_basic_cmd_test, true),
-                       [] %% Need to return a valid tatus, but don't care what's in it
+                       [] %% Need to return a valid status, but don't care what's in it
                end,
     ?assertEqual(ok, register_command(Cmd, [], [], Callback)),
     ?assertEqual(ok, run(Cmd)),
