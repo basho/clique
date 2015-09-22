@@ -19,6 +19,10 @@
 %% -------------------------------------------------------------------
 -module(clique).
 
+-ifdef(TEST).
+-include_lib("eunit/include/eunit.hrl").
+-endif.
+
 %% API
 -export([register/1,
          register_node_finder/1,
@@ -124,3 +128,19 @@ run(Cmd) ->
     M2 = clique_parser:extract_global_flags(M1),
     M3 = clique_parser:validate(M2),
     print(clique_command:run(M3), Cmd).
+
+-ifdef(TEST).
+
+basic_cmd_test() ->
+    clique_manager:start_link(), %% May already be started from a different test, which is fine.
+    Cmd = ["clique-test", "basic_cmd_test"],
+    Callback = fun(CallbackCmd, [], []) ->
+                       ?assertEqual(Cmd, CallbackCmd),
+                       put(pass_basic_cmd_test, true),
+                       [] %% Need to return a valid tatus, but don't care what's in it
+               end,
+    ?assertEqual(ok, register_command(Cmd, [], [], Callback)),
+    ?assertEqual(ok, run(Cmd)),
+    ?assertEqual(true, get(pass_basic_cmd_test)).
+
+-endif.
