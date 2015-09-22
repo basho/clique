@@ -19,6 +19,10 @@
 %% -------------------------------------------------------------------
 -module(clique).
 
+-ifdef(TEST).
+-include_lib("eunit/include/eunit.hrl").
+-endif.
+
 %% API
 -export([register/1,
          register_node_finder/1,
@@ -81,15 +85,24 @@ register_usage(Cmd, Usage) ->
     clique_usage:register(Cmd, Usage).
 
 %% @doc Take a list of status types and generate console output
--spec print(err() | clique_status:status() | {clique_status:status(), string()}, [string()]) -> ok.
+-spec print({error, term()}, term()) -> {error, 1};
+           ({clique_status:status(), integer(), string()}, [string()]) -> ok | {error, integer()};
+           (clique_status:status(), [string()]) -> ok.
 print({error, _} = E, Cmd) ->
-    print(E, Cmd, "human");
-print({Status, Format}, Cmd) ->
-    print(Status, Cmd, Format);
+    print(E, Cmd, "human"),
+    {error, 1};
+print({Status, ExitCode, Format}, Cmd) ->
+    print(Status, Cmd, Format),
+    case ExitCode of
+        0 -> ok;
+        _ -> {error, ExitCode}
+    end;
 print(Status, Cmd) ->
-    print(Status, Cmd, "human").
+    print(Status, Cmd, "human"),
+    ok.
 
--spec print(usage | err() | clique_status:status(), [string()], string()) -> ok.
+-spec print(usage | err() | clique_status:status(), [string()], string()) ->
+    ok | {error, integer()}.
 print(usage, Cmd, _Format) ->
     clique_usage:print(Cmd);
 print({error, _}=E, Cmd, Format) ->
@@ -108,10 +121,33 @@ print(Status, _Cmd, Format) ->
     io:format(RemoteStderr, "~ts", [Stderr]).
 
 %% @doc Run a config operation or command
--spec run([string()]) -> ok | {error, term()}.
+-spec run([string()]) -> ok | {error, integer()}.
 run(Cmd) ->
     M0 = clique_command:match(Cmd),
     M1 = clique_parser:parse(M0),
     M2 = clique_parser:extract_global_flags(M1),
     M3 = clique_parser:validate(M2),
     print(clique_command:run(M3), Cmd).
+
+-ifdef(TEST).
+
+basic_cmd_test() ->
+    clique_manager:start_link(), %% May already be started from a different test, which is fine.
+    Cmd = ["clique-test", "basic_cmd_test"],
+    Callback = fun(CallbackCmd, [], []) ->
+                       ?assertEqual(Cmd, CallbackCmd),
+                       put(pass_basic_cmd_test, true),
+                       [] %% Need to return a valid status, but don't care what's in it
+               end,
+    ?assertEqual(ok, register_command(Cmd, [], [], Callback)),
+    ?assertEqual(ok, run(Cmd)),
+    ?assertEqual(true, get(pass_basic_cmd_test)).
+
+cmd_error_status_test() ->
+    clique_manager:start_link(), %% May already be started from a different test, which is fine.
+    Cmd = ["clique-test", "cmd_error_status_test"],
+    Callback = fun(_, [], []) -> {exit_status, 123, []} end,
+    ?assertEqual(ok, register_command(Cmd, [], [], Callback)),
+    ?assertEqual({error, 123}, run(Cmd)).
+
+-endif.
