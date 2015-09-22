@@ -143,4 +143,11 @@ basic_cmd_test() ->
     ?assertEqual(ok, run(Cmd)),
     ?assertEqual(true, get(pass_basic_cmd_test)).
 
+cmd_error_status_test() ->
+    clique_manager:start_link(), %% May already be started from a different test, which is fine.
+    Cmd = ["clique-test", "cmd_error_status_test"],
+    Callback = fun(_, [], []) -> {exit_status, 123, []} end,
+    ?assertEqual(ok, register_command(Cmd, [], [], Callback)),
+    ?assertEqual({error, 123}, run(Cmd)).
+
 -endif.
