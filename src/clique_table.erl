@@ -22,6 +22,7 @@
 
 %% API
 -export([print/2, print/3,
+         print_lib/2, print_lib/3,
          create_table/2,
          autosize_create_table/2, autosize_create_table/3]).
 
@@ -41,18 +42,48 @@ print(_Spec, []) ->
     ok;
 %% Explict sizes were not given. This is called using the new status types.
 print(Schema, Rows) when is_list(hd(Schema)) ->
-    Table = autosize_create_table(Schema, Rows),
-    io:format("~n~ts~n", [Table]);
+    print_(io, Schema, Rows);
 print(Spec, Rows) ->
+    print_(io, Spec, Rows).
+
+-spec print_lib(list(), list()) -> ok.
+print_lib(_Spec, []) ->
+    "";
+%% Explict sizes were not given. This is called using the new status types.
+print_lib(Schema, Rows) when is_list(hd(Schema)) ->
+    print_(io_lib, Schema, Rows);
+print_lib(Spec, Rows) ->
+    print_(io_lib, Spec, Rows).
+
+-spec print_(io | io_lib, list(), list()) -> ok.
+print_(Mod, Schema, Rows) when is_list(hd(Schema)) ->
+    Table = autosize_create_table(Schema, Rows),
+    Mod:format("~n~ts~n", [Table]);
+print_(Mod, Spec, Rows) when Mod =:= io      orelse
+                                Mod =:= io_lib ->
     Table = create_table(Spec, Rows),
-    io:format("~n~ts~n", [Table]).
+    Mod:format("~n~ts~n", [Table]).
 
 -spec print(list(), list(), list()) -> ok.
 print(_Hdr, _Spec, []) ->
     ok;
 print(Header, Spec, Rows) ->
+    print_(io, Header, Spec, Rows).
+
+-spec print_lib(list(), list(), list()) -> ok.
+print_lib(_Hdr, _Spec, []) ->
+    "";
+print_lib(Header, Spec, Rows) ->
+    print_(io_lib, Header, Spec, Rows).
+
+-spec print_(io | io_lib, list(), list(), list()) -> ok.
+print_(io, _Hdr, _Spec, []) ->
+    ok;
+print_(io_lib, _Hdr, _Spec, []) ->
+    "";
+print_(Mod, Header, Spec, Rows) ->
     Table = create_table(Spec, Rows),
-    io:format("~ts~n~n~ts~n", [Header, Table]).
+    Mod:format("~ts~n~n~ts~n", [Header, Table]).
 
 -spec autosize_create_table([any()], [[any()]]) -> iolist().
 autosize_create_table(Schema, Rows) ->
