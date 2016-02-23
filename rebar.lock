@@ -1,0 +1,4 @@
+[{<<"cuttlefish">>,{pkg,<<"cuttlefish">>,<<"2.0.7">>},0},
+ {<<"getopt">>,{pkg,<<"getopt">>,<<"0.8.2">>},1},
+ {<<"goldrush">>,{pkg,<<"goldrush">>,<<"0.1.7">>},2},
+ {<<"lager">>,{pkg,<<"lager">>,<<"3.0.2">>},1}].
