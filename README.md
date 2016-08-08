@@ -186,7 +186,7 @@ Callback = fun set_transfer_limit/3,
 clique:register_config(Key, Callback).
 ```
 
-### register_config_formatter/2
+### register_formatter/2
 By default, the clique "show" command displays the underlying config value, as stored in the
 corresponding application env variable (the one exception being values of type "flag", which are
 automatically displayed by clique as the user-facing flag value defined in the cuttlefish schema).
@@ -206,7 +206,7 @@ F = fun(Val) ->
             riak_kv_multi_backend -> multi
         end
     end,
-clique:register_config_formatter(["storage_backend"], F).
+clique:register_formatter(["storage_backend"], F).
 ```
 
 ### register_config_whitelist/1
