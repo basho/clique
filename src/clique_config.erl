@@ -137,10 +137,10 @@ set(Args, [{all, _}]) ->
 set(Args, [{node, NodeStr}]) ->
     M1 = clique_typecast:to_node(NodeStr),
     M2 = rpc_set(M1, Args),
-    return_set_status(M2);
+    return_set_status(M2, NodeStr);
 set(Args, []) ->
     M1 = do_set(Args),
-    return_set_status(M1);
+    return_set_status(M1, node());
 set(_Args, _Flags) ->
     app_config_flags_error().
 
@@ -149,11 +149,11 @@ rpc_set({error, _} = E, _Args) ->
 rpc_set(Node, Args) ->
     clique_nodes:safe_rpc(Node, ?MODULE, do_set, [Args]).
 
-return_set_status({error, _} = E) ->
+return_set_status({error, _} = E, _Node) ->
     E;
-return_set_status(BR = {badrpc, _Reason}) ->
-    clique_error:badrpc_to_error(BR);
-return_set_status({_Node, Result}) ->
+return_set_status({badrpc, Reason}, Node) ->
+    clique_error:badrpc_to_error(Node, Reason);
+return_set_status({_, Result}, _Node) ->
     [clique_status:text(Result)].
 
 do_set(Args) ->
@@ -187,8 +187,7 @@ check_keys_in_whitelist(Keys) ->
         _ -> {error, {config_not_settable, Invalid}}
     end.
 
--spec get_env_status([envkey()], cuttlefish_flag_list(), flags()) -> status() |
-                                                                                         err().
+-spec get_env_status([envkey()], cuttlefish_flag_list(), flags()) -> status() | err().
 get_env_status(EnvKeys, CuttlefishFlags, []) ->
     get_local_env_status(EnvKeys, CuttlefishFlags);
 get_env_status(EnvKeys, CuttlefishFlags, Flags) when length(Flags) =:= 1 ->
@@ -228,15 +227,12 @@ get_local_env_vals(EnvKeys, CuttlefishFlags) ->
             end || {{KeyStr, {App, Key}}, CFlagSpec} <- lists:zip(EnvKeys, CuttlefishFlags)],
     [{"node", node()} | Vals].
 
--spec get_remote_env_status([envkey()], cuttlefish_flag_list(), node()) ->
-    status().
+-spec get_remote_env_status([envkey()], cuttlefish_flag_list(), node()) -> status() | err().
 get_remote_env_status(EnvKeys, CuttlefishFlags, Node) ->
     case clique_nodes:safe_rpc(Node, ?MODULE, get_local_env_status,
                                [EnvKeys, CuttlefishFlags]) of
-        {badrpc, rpc_process_down} ->
-            {error, {rpc_process_down, Node}};
-        {badrpc, nodedown} ->
-            {error, {nodedown, Node}};
+        {badrpc, Reason} ->
+            clique_error:badrpc_to_error(Node, Reason);
         Status ->
             Status
     end.
@@ -279,7 +275,7 @@ run_callback(Args) ->
     %% where this result came from when we use multicall:
     {node(), Output}.
 
--spec get_config(args()) -> err() | {proplist(), proplist()}.
+-spec get_config(args()) -> err() | {args(), proplist(), proplist()}.
 get_config([]) ->
     {error, set_no_args};
 get_config(Args) ->
@@ -300,7 +296,7 @@ set_config({Args, AppConfig, Conf}) ->
     Keys = [K || {K, _}  <- Args],
     case check_keys_in_whitelist(Keys) of
         ok ->
-            set_app_config(AppConfig),
+            _ = set_app_config(AppConfig),
             Conf;
         {error, _}=E ->
             E
