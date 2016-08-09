@@ -170,19 +170,27 @@ exceed the new limit.
 Configuration specific behaviour can be managed by registering a callback to
 fire when a given configuration variable is set on the cli. The callback runs
 *after* the corresponding environment variables are set. The callback function
-is a 3-arity function that gets called with the original key (as a list of
-strings()), the untranslated value to set (as a string()) and the flags passed
-on the command-line. The flags can be either '--all' to run on all nodes, or
---node N to run on node N. If no flags are given the command should be executed
-on the local node (where the cli command was run) only.
+is a 2-arity function that gets called with the original key (as a list of
+strings()), and the untranslated value to set (as a string()).
+
+On the command-line, the flags can be either '--all' to run on all nodes, or
+--node N to run on node N instead of the local node. If no flags are given,
+the config change will take place on the local node (where the cli command was
+run) only. These flags are not visible to the callback function; rather, the
+callback function will be called on whichever nodes the config change is being
+made.
+
+Unlike command callbacks, config callbacks need only return a short string
+describing any immediate results of the config change that may have taken
+place. This allows results from --all to be compiled into a table, and lets
+results from other invocations be displayed via simple status messages.
 
 ```erlang
--spec set_transfer_limit(Key :: [string()], Val :: string(),
-                         Flags :: [{atom(), proplist()}]).
+-spec set_transfer_limit(Key :: [string()], Val :: string()) -> Result :: string().
 ...
 
 Key = ["transfer_limit"],
-Callback = fun set_transfer_limit/3,
+Callback = fun set_transfer_limit/2,
 clique:register_config(Key, Callback).
 ```
 
