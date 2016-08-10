@@ -409,4 +409,105 @@ schema_paths_test() ->
     ok = file:delete("example.schema"),
     ?assertEqual([], schema_paths([Cwd])).
 
+set_config_test_() ->
+    {setup,
+     fun set_config_test_setup/0,
+     fun set_config_test_teardown/1,
+     [
+      fun test_blacklisted_conf/0,
+      fun test_set_basic/0,
+      fun test_set_bad_flags/0,
+      fun test_set_all_flag/0,
+      fun test_set_node_flag/0,
+      fun test_set_bad_node/0,
+      fun test_set_config_callback/0,
+      fun test_set_callback_output/0
+     ]}.
+
+-define(SET_TEST_SCHEMA_FILE, "test.schema").
+
+set_config_test_setup() ->
+    Schema = <<"{mapping, \"test.config\", \"clique.config_test\", [{datatype, integer}]}.">>,
+    {ok, Cwd} = file:get_cwd(),
+
+    ?assertEqual(ok, clique_nodes:init()),
+    ?assertEqual(true, clique_nodes:register(fun() -> [node()] end)),
+
+    ?assertEqual(ok, file:write_file(?SET_TEST_SCHEMA_FILE, Schema)),
+    ?assertEqual(ok, init()),
+    ?assertEqual(ok, load_schema([Cwd])).
+
+set_config_test_teardown(_) ->
+    _ = ets:delete(?config_table),
+    _ = ets:delete(?schema_table),
+    _ = ets:delete(?whitelist_table),
+    _ = ets:delete(?formatter_table),
+
+    file:delete(?SET_TEST_SCHEMA_FILE),
+
+    clique_nodes:teardown().
+
+test_blacklisted_conf() ->
+    true = ets:delete_all_objects(?whitelist_table),
+    ?assertEqual({error, {config_not_settable, ["test.config"]}}, set([{"test.config", "42"}], [])).
+
+test_set_basic() ->
+    ?assertEqual(ok, whitelist(["test.config"])),
+
+    Result = set([{"test.config", "42"}], []),
+    ?assertNotMatch({error, _}, Result),
+    ?assertEqual({ok, 42}, application:get_env(clique, config_test)).
+
+test_set_bad_flags() ->
+    Result = set([{"test.config", "43"}], [{all, undefined}, {node, node()}]),
+    ?assertMatch({error, {invalid_flag_combination, _}}, Result).
+
+test_set_all_flag() ->
+    ?assertEqual(ok, whitelist(["test.config"])),
+    Result = set([{"test.config", "44"}], [{all, undefined}]),
+    ?assertNotMatch({error, _}, Result),
+    ?assertEqual({ok, 44}, application:get_env(clique, config_test)).
+
+test_set_node_flag() ->
+    ?assertEqual(ok, whitelist(["test.config"])),
+    Result = set([{"test.config", "45"}], [{node, atom_to_list(node())}]),
+    ?assertNotMatch({error, _}, Result),
+    ?assertEqual({ok, 45}, application:get_env(clique, config_test)).
+
+test_set_bad_node() ->
+    Result = set([{"test.config", "46"}], [{node, "bad_node@127.0.0.1"}]),
+    ?assertEqual({error, bad_node}, Result).
+
+test_set_config_callback() ->
+    true = ets:delete_all_objects(?config_table),
+    Callback = fun(Key, Val) -> 
+                       ?assertEqual(["test", "config"], Key),
+                       application:set_env(clique, config_test_x10, 10 * list_to_integer(Val)),
+                       "Callback called"
+               end,
+    ?MODULE:register(["test", "config"], Callback),
+    set([{"test.config", "47"}], []),
+    ?assertEqual({ok, 47}, application:get_env(clique, config_test)),
+    ?assertEqual({ok, 470}, application:get_env(clique, config_test_x10)).
+
+test_set_callback_output() ->
+    true = ets:delete_all_objects(?config_table),
+    Callback = fun(_, _) -> "Done" end,
+    ?MODULE:register(["test", "config"], Callback),
+
+    ExpectedText = <<"test.config set to \"48\"\nDone">>,
+    %% Slightly fragile way to test this, since we assume the internal representation
+    %% for clique text statuses won't change in the future. But this seems better than
+    %% any alternative I can think of, since two different iolists representing the
+    %% same data may or may not compare equal.
+    [{text, OutText}] = set([{"test.config", "48"}], []),
+    ?assertEqual(ExpectedText, iolist_to_binary(OutText)),
+
+    ExpectedRow = [{"Node", node()},
+                   {"Node Down/Unreachable", false},
+                   {"Result", OutText}],
+    ExpectedTable = [clique_status:table([ExpectedRow])],
+    Result = set([{"test.config", "48"}], [{all, undefined}]),
+    ?assertEqual(ExpectedTable, Result).
+
 -endif.
