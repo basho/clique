@@ -262,15 +262,7 @@ get_remote_env_status(EnvKeys, CuttlefishFlags) ->
 run_callback({error, _}=E) ->
     E;
 run_callback(Args) ->
-    KVFuns = lists:foldl(fun({K, V}, Acc) ->
-                             case ets:lookup(?config_table, K) of
-                                 [{K, F}] ->
-                                     [{K, V, F} | Acc];
-                                 [] ->
-                                     Acc
-                             end
-                         end, [], Args),
-    OutStrings = [run_callback(K, V, F) || {K, V, F} <- KVFuns],
+    OutStrings = [run_callback(K, V, F) || {K, V} <- Args, {_, F} <- ets:lookup(?config_table, K)],
     Output = string:join(OutStrings, "\n"), %% TODO return multiple strings tagged with keys
     %% Tag the return value with our current node so we know
     %% where this result came from when we use multicall:
