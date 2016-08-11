@@ -180,7 +180,7 @@ run) only. These flags are not visible to the callback function; rather, the
 callback function will be called on whichever nodes the config change is being
 made.
 
-Unlike command callbacks, config callbacks need only return a short string
+Unlike command callbacks, config callbacks need only return a short iolist
 describing any immediate results of the config change that may have taken
 place. This allows results from --all to be compiled into a table, and lets
 results from other invocations be displayed via simple status messages.

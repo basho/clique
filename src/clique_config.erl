@@ -47,6 +47,7 @@
 -type flagspecs() :: [spec()].
 -type flags() :: proplist().
 -type args() :: clique_parser:args().
+-type conf() :: [{[string()], string()}].
 
 -type envkey() :: {string(), {atom(), atom()}}.
 -type cuttlefish_flag_spec() :: {flag, atom(), atom()}.
@@ -257,7 +258,7 @@ get_remote_env_status(EnvKeys, CuttlefishFlags) ->
 
 
 -spec run_callback(err()) -> err();
-                  (args()) -> {node, string()}.
+                  (conf()) -> {node, iolist()}.
 run_callback({error, _}=E) ->
     E;
 run_callback(Args) ->
@@ -269,13 +270,23 @@ run_callback(Args) ->
                                      Acc
                              end
                          end, [], Args),
-    OutStrings = [F(K, V) || {K, V, F} <- KVFuns],
+    OutStrings = [run_callback(K, V, F) || {K, V, F} <- KVFuns],
     Output = string:join(OutStrings, "\n"), %% TODO return multiple strings tagged with keys
     %% Tag the return value with our current node so we know
     %% where this result came from when we use multicall:
     {node(), Output}.
 
--spec get_config(args()) -> err() | {args(), proplist(), proplist()}.
+run_callback(K, V, F) ->
+    KeyString = cuttlefish_variable:format(K),
+    UpdateMsg = io_lib:format("~s set to ~p", [KeyString, V]),
+    case F(K, V) of
+        "" ->
+            UpdateMsg;
+        Output ->
+            [UpdateMsg, $\n, Output]
+    end.
+
+-spec get_config(args()) -> err() | {args(), proplist(), conf()}.
 get_config([]) ->
     {error, set_no_args};
 get_config(Args) ->
@@ -289,7 +300,7 @@ get_config(Args) ->
     end.
 
 -spec set_config(err()) -> err();
-                ({args(), proplist(), proplist()}) -> err() | proplist().
+                ({args(), proplist(), conf()}) -> err() | conf().
 set_config({error, _}=E) ->
     E;
 set_config({Args, AppConfig, Conf}) ->
