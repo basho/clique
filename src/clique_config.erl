@@ -135,20 +135,14 @@ set(Args, [{all, _}]) ->
 
     NodeStatuses = lists:sort(Down ++ Results),
     [clique_status:table(NodeStatuses)];
-set(Args, [{node, NodeStr}]) ->
-    M1 = clique_typecast:to_node(NodeStr),
-    M2 = rpc_set(M1, Args),
-    return_set_status(M2, NodeStr);
+set(Args, [{node, Node}]) ->
+    M1 = clique_nodes:safe_rpc(Node, ?MODULE, do_set, [Args]),
+    return_set_status(M1, Node);
 set(Args, []) ->
     M1 = do_set(Args),
     return_set_status(M1, node());
 set(_Args, _Flags) ->
     app_config_flags_error().
-
-rpc_set({error, _} = E, _Args) ->
-    E;
-rpc_set(Node, Args) ->
-    clique_nodes:safe_rpc(Node, ?MODULE, do_set, [Args]).
 
 return_set_status({error, _} = E, _Node) ->
     E;
@@ -419,7 +413,6 @@ set_config_test_() ->
       fun test_set_bad_flags/0,
       fun test_set_all_flag/0,
       fun test_set_node_flag/0,
-      fun test_set_bad_node/0,
       fun test_set_config_callback/0,
       fun test_set_callback_output/0
      ]}.
@@ -470,13 +463,9 @@ test_set_all_flag() ->
 
 test_set_node_flag() ->
     ?assertEqual(ok, whitelist(["test.config"])),
-    Result = set([{"test.config", "45"}], [{node, atom_to_list(node())}]),
+    Result = set([{"test.config", "45"}], [{node, node()}]),
     ?assertNotMatch({error, _}, Result),
     ?assertEqual({ok, 45}, application:get_env(clique, config_test)).
-
-test_set_bad_node() ->
-    Result = set([{"test.config", "46"}], [{node, "bad_node@127.0.0.1"}]),
-    ?assertEqual({error, bad_node}, Result).
 
 test_set_config_callback() ->
     true = ets:delete_all_objects(?config_table),
