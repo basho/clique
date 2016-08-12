@@ -20,7 +20,8 @@
 -module(clique_error).
 
 %% API
--export([format/2]).
+-export([format/2,
+         badrpc_to_error/2]).
 
 -type status() :: clique_status:status().
 -type err() :: {error, term()}.
@@ -82,10 +83,19 @@ format(_Cmd, {error, {nodedown, Node}}) ->
     status(io_lib:format("Target node is down: ~p~n", [Node]));
 format(_Cmd, {error, bad_node}) ->
     status("Invalid node name");
+format(_Cmd, {error, {{badrpc, Reason}, Node}}) ->
+    status(io_lib:format("RPC to node ~p failed for reason: ~p~n", [Node, Reason]));
 format(_Cmd, {error, {conversion, _}}=TypeError) ->
     %% Type-conversion error originating in cuttlefish
     status(cuttlefish_error:xlate(TypeError)).
 
+-spec badrpc_to_error(string() | node(), term()) -> err().
+badrpc_to_error(Node, nodedown) ->
+    {error, {nodedown, Node}};
+badrpc_to_error(Node, rpc_process_down) ->
+    {error, {rpc_process_down, Node}};
+badrpc_to_error(Node, Reason) ->
+    {error, {{badrpc, Reason}, Node}}.
 
 -spec status(string()) -> status().
 status(Str) ->
