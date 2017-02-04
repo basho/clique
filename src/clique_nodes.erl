@@ -1,6 +1,6 @@
 %% -------------------------------------------------------------------
 %%
-%% Copyright (c) 2014 Basho Technologies, Inc.  All Rights Reserved.
+%% Copyright (c) 2014-2017 Basho Technologies, Inc.
 %%
 %% This file is provided to you under the Apache License,
 %% Version 2.0 (the "License"); you may not use this file
@@ -17,12 +17,15 @@
 %% under the License.
 %%
 %% -------------------------------------------------------------------
+
 -module(clique_nodes).
 
--export([init/0,
-         safe_rpc/4,
-         nodes/0,
-         register/1]).
+-export([
+    init/0,
+    safe_rpc/4,
+    nodes/0,
+    register/1
+]).
 
 -ifdef(TEST).
 -export([teardown/0]).
@@ -33,6 +36,13 @@
 init() ->
     _ = ets:new(?nodes_table, [public, named_table]),
     ok.
+
+-ifdef(TEST).
+-spec teardown() -> ok.
+teardown() ->
+    _ = ets:delete(?nodes_table),
+    ok.
+-endif.
 
 -spec register(fun()) -> true.
 register(Fun) ->
@@ -56,8 +66,3 @@ safe_rpc(Node, Module, Function, Args) ->
         exit:{noproc, _NoProcDetails} ->
             {badrpc, rpc_process_down}
     end.
-
--ifdef(TEST).
-teardown() ->
-    ets:delete(?nodes_table).
--endif.

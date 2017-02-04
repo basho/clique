@@ -1,6 +1,6 @@
 %% -------------------------------------------------------------------
 %%
-%% Copyright (c) 2014 Basho Technologies, Inc.  All Rights Reserved.
+%% Copyright (c) 2014-2017 Basho Technologies, Inc.
 %%
 %% This file is provided to you under the Apache License,
 %% Version 2.0 (the "License"); you may not use this file
@@ -17,10 +17,22 @@
 %% under the License.
 %%
 %% -------------------------------------------------------------------
+
 -module(clique_usage).
 
+%% API
+-export([
+    init/0,
+    find/1,
+    register/2,
+    print/1
+]).
+
+-export_type([usage/0]).
+
 -ifdef(TEST).
--compile(export_all).
+%-compile(export_all).
+-export([teardown/0]).
 -include_lib("eunit/include/eunit.hrl").
 -endif.
 
@@ -31,17 +43,16 @@
 -type usage_function() :: fun(() -> iolist()).
 -type usage() :: iolist() | usage_function().
 
--export_type([usage/0]).
-
-%% API
--export([init/0,
-         find/1,
-         register/2,
-         print/1]).
-
 init() ->
     _ = ets:new(?usage_table, [public, named_table]),
     ok.
+
+-ifdef(TEST).
+-spec teardown() -> ok.
+teardown() ->
+    _ = ets:delete(?usage_table),
+    ok.
+-endif.
 
 %% @doc Register usage for a given command sequence. Lookups are by longest
 %% match.
@@ -61,11 +72,11 @@ print(Cmd = [Script, "set" | _]) ->
     clique:print(Usage, Cmd);
 print(Cmd) ->
     Usage = case find(Cmd) of
-                {error, Error} ->
-                    Error;
-                Usage2 ->
-                    Usage2
-            end,
+        {error, Error} ->
+            Error;
+        Usage2 ->
+            Usage2
+    end,
     io:format("~s", [Usage]).
 
 -spec find(iolist()) -> iolist() | err().
@@ -83,17 +94,17 @@ find(Cmd) ->
     end.
 
 -ifdef(TEST).
-find_different_types_test() ->
+find_different_types_test_() ->
     {setup,
-     fun init/0,
-     fun(_) -> ets:delete(?usage_table) end,
-     ?_test(begin
-                String = "clique foo [-f]\n",
-                Fun = fun() -> String end,
-                ?MODULE:register(["fun", "usage"], Fun),
-                ?MODULE:register(["string", "usage"], String),
-                ?assertEqual([?usage_prefix, String], find(["fun", "usage"])),
-                ?assertEqual([?usage_prefix, String], find(["string", "usage"])),
-                ?assertMatch({error, _}, find(["foo"]))
-            end)}.
+        fun init/0,
+        fun(_) -> teardown() end,
+        ?_test(begin
+            String = "clique foo [-f]\n",
+            Fun = fun() -> String end,
+            ?MODULE:register(["fun", "usage"], Fun),
+            ?MODULE:register(["string", "usage"], String),
+            ?assertEqual([?usage_prefix, String], find(["fun", "usage"])),
+            ?assertEqual([?usage_prefix, String], find(["string", "usage"])),
+            ?assertMatch({error, _}, find(["foo"]))
+        end)}.
 -endif.

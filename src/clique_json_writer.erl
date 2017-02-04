@@ -1,6 +1,6 @@
 %% -------------------------------------------------------------------
 %%
-%% Copyright (c) 2015 Basho Technologies, Inc.  All Rights Reserved.
+%% Copyright (c) 2015-2017 Basho Technologies, Inc.
 %%
 %% This file is provided to you under the Apache License,
 %% Version 2.0 (the "License"); you may not use this file
@@ -17,6 +17,7 @@
 %% under the License.
 %%
 %% -------------------------------------------------------------------
+
 -module(clique_json_writer).
 
 %% @doc Write status information in JSON format.
@@ -53,8 +54,10 @@
 
 -spec write(status()) -> {iolist(), iolist()}.
 write(Status) ->
+    % make xref and dialyzer happy
+    JsonMod = mochijson2,
     PreparedOutput = lists:reverse(prepare(Status)),
-    {[mochijson2:encode(PreparedOutput), "\n"], []}.
+    {[JsonMod:encode(PreparedOutput), "\n"], []}.
 
 %% @doc Returns status data that's been prepared for conversion to JSON.
 %% Just reverse the list and pass it to mochijson2:encode and you're set.

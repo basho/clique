@@ -1,6 +1,6 @@
 %% -------------------------------------------------------------------
 %%
-%% Copyright (c) 2014 Basho Technologies, Inc.  All Rights Reserved.
+%% Copyright (c) 2014-2017 Basho Technologies, Inc.
 %%
 %% This file is provided to you under the Apache License,
 %% Version 2.0 (the "License"); you may not use this file
@@ -18,26 +18,28 @@
 %%
 %% -------------------------------------------------------------------
 
+%% @doc This module provides a central place to register different output writers
+%% with clique (e.g. human-readable, CSV, etc.)
+%% There are some built in, but we also allow applications to register their
+%% own custom writers if they so choose.
 -module(clique_writer).
 
 -define(writer_table, clique_writers).
 
 -define(BUILTIN_WRITERS, [
-                          {"human", clique_human_writer},
-                          {"csv", clique_csv_writer}
-                         ]).
+    {"human", clique_human_writer},
+    {"csv", clique_csv_writer}
+]).
 
 -export([
-         init/0,
-         register/2,
-         write/2
-        ]).
+    init/0,
+    register/2,
+    write/2
+]).
 
-%% @doc This module provides a central place to register different output writers
-%% with clique (e.g. human-readable, CSV, etc.)
-%% There are some built in, but we also allow applications to register their
-%% own custom writers if they so choose.
-
+-ifdef(TEST).
+-export([teardown/0]).
+-endif.
 -include("clique_status_types.hrl").
 
 %% TODO factor err type out into single clique:err() type - DRY!
@@ -56,9 +58,16 @@ init() ->
         non_existing ->
             ok;
         _ ->
-            ets:insert(?writer_table, {"json", clique_json_writer})
-    end,
+            ets:insert(?writer_table, {"json", clique_json_writer}),
+            ok
+    end.
+
+-ifdef(TEST).
+-spec teardown() -> ok.
+teardown() ->
+    _ = ets:delete(?writer_table),
     ok.
+-endif.
 
 -spec register(string(), module()) -> true.
 register(Name, Module) ->
@@ -70,7 +79,8 @@ write(Status, Format) ->
         [{Format, Module}] ->
             Module:write(Status);
         [] ->
-            Error = io_lib:format("Invalid format ~p! Defaulted to human-readable.~n", [Format]),
+            Error = io_lib:format(
+                "Invalid format ~p! Defaulted to human-readable.~n", [Format]),
             {Stdout, Stderr} = clique_human_writer:write(Status),
             {Stdout, [Stderr, "\n", Error]}
     end.

@@ -1,6 +1,6 @@
 %% -------------------------------------------------------------------
 %%
-%% Copyright (c) 2014 Basho Technologies, Inc.  All Rights Reserved.
+%% Copyright (c) 2014-2017 Basho Technologies, Inc.
 %%
 %% This file is provided to you under the Apache License,
 %% Version 2.0 (the "License"); you may not use this file
@@ -17,6 +17,7 @@
 %% under the License.
 %%
 %% -------------------------------------------------------------------
+
 -module(clique_manager).
 
 -behaviour(gen_server).
@@ -31,6 +32,18 @@
          code_change/3
         ]).
 
+-ifdef(TEST).
+-export([teardown/0]).
+-endif.
+
+-define(init_mods, [
+    clique_writer,
+    clique_command,
+    clique_usage,
+    clique_config,
+    clique_nodes
+]).
+
 -record(state, {}).
 
 start_link() ->
@@ -42,11 +55,7 @@ start_link() ->
 %% messages, it can only die if explicitly killed.
 %%
 init([]) ->
-    ok = clique_writer:init(),
-    ok = clique_command:init(),
-    ok = clique_usage:init(),
-    ok = clique_config:init(),
-    ok = clique_nodes:init(),
+    lists:foreach(fun(M) -> ok = M:init() end, ?init_mods),
     {ok, #state{}}.
 
 handle_call(_Msg, _From, State) ->
@@ -60,3 +69,10 @@ terminate(_Reason, _State) ->
 code_change(_OldVsn, State, _Extra) ->
     {ok, State}.
 
+-ifdef(TEST).
+-spec teardown() -> ok.
+teardown() ->
+    lists:foreach(fun(M) ->
+        catch M:teardown()
+    end, lists:reverse(?init_mods)).
+-endif.

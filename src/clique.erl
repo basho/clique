@@ -1,6 +1,6 @@
 %% -------------------------------------------------------------------
 %%
-%% Copyright (c) 2014 Basho Technologies, Inc.  All Rights Reserved.
+%% Copyright (c) 2014-2017 Basho Technologies, Inc.
 %%
 %% This file is provided to you under the Apache License,
 %% Version 2.0 (the "License"); you may not use this file
@@ -17,23 +17,29 @@
 %% under the License.
 %%
 %% -------------------------------------------------------------------
--module(clique).
 
--ifdef(TEST).
--include_lib("eunit/include/eunit.hrl").
--endif.
+-module(clique).
 
 %% API
 -export([register/1,
-         register_node_finder/1,
-         register_command/4,
-         register_config/2,
-         register_formatter/2,
-         register_writer/2,
-         register_config_whitelist/1,
-         register_usage/2,
-         run/1,
-         print/2]).
+    register_node_finder/1,
+    register_command/4,
+    register_config/2,
+    register_formatter/2,
+    register_writer/2,
+    register_config_whitelist/1,
+    register_usage/2,
+    run/1,
+    print/2]).
+
+-ifdef(TEST).
+-export([
+    create_test_dir/0,
+    delete_test_dir/1,
+    ensure_stopped/0
+]).
+-include_lib("eunit/include/eunit.hrl").
+-endif.
 
 -type err() :: {error, term()}.
 
@@ -86,8 +92,8 @@ register_usage(Cmd, Usage) ->
 
 %% @doc Take a list of status types and generate console output
 -spec print({error, term()}, term()) -> {error, 1};
-           ({clique_status:status(), integer(), string()}, [string()]) -> ok | {error, integer()};
-           (clique_status:status(), [string()]) -> ok.
+        ({clique_status:status(), integer(), string()}, [string()]) -> ok | {error, integer()};
+        (clique_status:status(), [string()]) -> ok.
 print({error, _} = E, Cmd) ->
     print(E, Cmd, "human"),
     {error, 1};
@@ -105,7 +111,7 @@ print(Status, Cmd) ->
     ok | {error, integer()}.
 print(usage, Cmd, _Format) ->
     clique_usage:print(Cmd);
-print({error, _}=E, Cmd, Format) ->
+print({error, _} = E, Cmd, Format) ->
     Alert = clique_error:format(hd(Cmd), E),
     print(Alert, Cmd, Format);
 print(Status, _Cmd, Format) ->
@@ -131,23 +137,62 @@ run(Cmd) ->
 
 -ifdef(TEST).
 
+-spec create_test_dir() -> string() | no_return().
+%% Exported: Creates a new, empty, uniquely-named directory for testing.
+create_test_dir() ->
+    string:strip(?cmd("mktemp -d /tmp/" ?MODULE_STRING ".XXXXXXX"), both, $\n).
+
+-spec delete_test_dir(Dir :: string()) -> ok | no_return().
+%% Exported: Deletes a test directory fully, whether it exists or not.
+delete_test_dir(Dir) ->
+    ?assertCmd("rm -rf " ++ Dir).
+
+-spec ensure_stopped() -> ok.
+%% Exported: Makes sure application processes are all stopped.
+ensure_stopped() ->
+    % Tests may start portions of the app, so work through whatever may be
+    % running. The final clique_manager:teardown/0 should delete any leftover
+    % ETS tables, so by the time we're done here the environment should be
+    % entirely cleaned up.
+    _ = application:stop(clique),
+    lists:foreach(fun(Proc) ->
+        case erlang:whereis(Proc) of
+            Pid when erlang:is_pid(Pid) ->
+                erlang:unlink(Pid),
+                erlang:exit(Pid, shutdown);
+            _ ->
+                ok
+        end
+    end, [clique_sup, clique_manager]),
+    clique_manager:teardown().
+
 basic_cmd_test() ->
-    clique_manager:start_link(), %% May already be started from a different test, which is fine.
+    start_manager(),
     Cmd = ["clique-test", "basic_cmd_test"],
     Callback = fun(CallbackCmd, [], []) ->
-                       ?assertEqual(Cmd, CallbackCmd),
-                       put(pass_basic_cmd_test, true),
-                       [] %% Need to return a valid status, but don't care what's in it
-               end,
+        ?assertEqual(Cmd, CallbackCmd),
+        put(pass_basic_cmd_test, true),
+        [] %% Need to return a valid status, but don't care what's in it
+    end,
     ?assertEqual(ok, register_command(Cmd, [], [], Callback)),
     ?assertEqual(ok, run(Cmd)),
     ?assertEqual(true, get(pass_basic_cmd_test)).
 
 cmd_error_status_test() ->
-    clique_manager:start_link(), %% May already be started from a different test, which is fine.
+    start_manager(),
     Cmd = ["clique-test", "cmd_error_status_test"],
     Callback = fun(_, [], []) -> {exit_status, 123, []} end,
     ?assertEqual(ok, register_command(Cmd, [], [], Callback)),
     ?assertEqual({error, 123}, run(Cmd)).
+
+start_manager() ->
+    %% May already be started from a different test, which is fine, but we
+    %% don't want it linked to the test process.
+    case clique_manager:start_link() of
+        {ok, Pid} ->
+            erlang:unlink(Pid);
+        _ ->
+            ok
+    end.
 
 -endif.
