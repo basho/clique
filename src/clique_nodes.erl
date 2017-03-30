@@ -24,6 +24,10 @@
          nodes/0,
          register/1]).
 
+-ifdef(TEST).
+-export([teardown/0]).
+-endif.
+
 -define(nodes_table, clique_nodes).
 
 init() ->
@@ -53,3 +57,7 @@ safe_rpc(Node, Module, Function, Args) ->
             {badrpc, rpc_process_down}
     end.
 
+-ifdef(TEST).
+teardown() ->
+    ets:delete(?nodes_table).
+-endif.
