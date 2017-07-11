@@ -1,0 +1,12 @@
+{"1.1.0",
+[{<<"cuttlefish">>,{pkg,<<"cuttlefish">>,<<"2.0.11">>},0},
+ {<<"getopt">>,{pkg,<<"getopt">>,<<"0.8.2">>},1},
+ {<<"goldrush">>,{pkg,<<"goldrush">>,<<"0.1.9">>},2},
+ {<<"lager">>,{pkg,<<"lager">>,<<"3.2.4">>},1}]}.
+[
+{pkg_hash,[
+ {<<"cuttlefish">>, <<"D266AC68BA801803ACE4EF3DEC0FC419F184092E1882E19F7AFC29A6D4334E6A">>},
+ {<<"getopt">>, <<"B17556DB683000BA50370B16C0619DF1337E7AF7ECBF7D64FBF8D1D6BCE3109B">>},
+ {<<"goldrush">>, <<"F06E5D5F1277DA5C413E84D5A2924174182FB108DABB39D5EC548B27424CD106">>},
+ {<<"lager">>, <<"A6DEB74DAE7927F46BD13255268308EF03EB206EC784A94EAF7C1C0F3B811615">>}]}
+].
