@@ -420,6 +420,9 @@ set_config_test_() ->
 -define(SET_TEST_SCHEMA_FILE, "test.schema").
 
 set_config_test_setup() ->
+    %% belt and braces, failing tests observed on ubuntu 16.04 fixed
+    %% by this addition TODO figure out why and better address
+    (catch set_config_test_teardown(ok)),
     Schema = <<"{mapping, \"test.config\", \"clique.config_test\", [{datatype, integer}]}.">>,
     {ok, Cwd} = file:get_cwd(),
 
