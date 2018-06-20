@@ -84,8 +84,9 @@ parse_kv_args([Arg | Args], Acc) ->
             parse_kv_args(Args, [{Key, Val} | Acc]);
         [Key] ->
             {error, {invalid_kv_arg, Key}};
-        _ ->
-            {error, {too_many_equal_signs, Arg}}
+        [Key | ValTokens] ->
+            GluedValTokens = string:join(ValTokens, "="),
+            parse_kv_args(Args, [{Key, GluedValTokens} | Acc])
     end.
 
 
@@ -368,6 +369,13 @@ parse_valid_args_and_flag_test() ->
     {Spec, Args, Flags} = parse({Spec, ArgsAndFlags}),
     ?assertEqual(Args, [{"key", "value"}]),
     ?assertEqual(Flags, [{$n, Node}]).
+
+parse_valid_arg_value_with_equal_sign_test() ->
+    Spec = spec(),
+    ArgsAndFlags = ["url=example.com?q=dada"],
+    {Spec, Args, Flags} = parse({Spec, ArgsAndFlags}),
+    ?assertEqual(Args, [{"url", "example.com?q=dada"}]),
+    ?assertEqual(Flags, []).
 
 %% All arguments must be of type k=v
 parse_invalid_kv_arg_test() ->
