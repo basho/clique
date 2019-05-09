@@ -62,8 +62,6 @@ format(_Cmd, {error, {invalid_flag_combination, Msg}}) ->
     status(io_lib:format("Error: ~ts", [Msg]));
 format(_Cmd, {error, {invalid_value, Val}}) ->
     status(io_lib:format("Invalid value: ~p", [Val]));
-format(_Cmd, {error, {too_many_equal_signs, Arg}}) ->
-    status(io_lib:format("Too many equal signs in argument: ~p", [Arg]));
 format(_Cmd, {error, {invalid_config_keys, Invalid}}) ->
     status(io_lib:format("Invalid config keys: ~ts", [Invalid]));
 format(_Cmd, {error, {invalid_config, {error, [_H|_T]=Msgs}}}) ->
