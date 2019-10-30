@@ -14,6 +14,8 @@
          terminate/2,
          code_change/3]).
 
+-include("stacktrace.hrl").
+
 -behaviour(gen_server).
 
 -record(state, {output=[], size={80,20}}).
@@ -114,8 +116,8 @@ io_request({put_chars, M, F, A}, State) ->
     try apply(M, F, A) of
         Chars ->
             io_request({put_chars, Chars}, State)
-    catch C:T ->
-            {{error, {C,T, erlang:get_stacktrace()}}, State}
+    catch ?_exception_(C, T, StackToken) ->
+            {{error, {C,T, ?_get_stacktrace_(StackToken)}}, State}
     end;
 io_request({put_chars, _Enc, Chars}, State) ->
     io_request({put_chars, Chars}, State);
