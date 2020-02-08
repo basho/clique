@@ -58,6 +58,8 @@ format(_Cmd, {error, {invalid_flags, Flags}}) ->
     status(io_lib:format("Invalid Flags: ~p", [Flags]));
 format(_Cmd, {error, {invalid_flag_value, {Name, Val}}}) ->
     status(io_lib:format("Invalid value: ~p for flag: ~p", [Val, Name]));
+format(_Cmd, {error, {invalid_kv_arg, Arg}}) ->
+    status(io_lib:format("Empty value in argument: ~p", [Arg]));
 format(_Cmd, {error, {invalid_flag_combination, Msg}}) ->
     status(io_lib:format("Error: ~ts", [Msg]));
 format(_Cmd, {error, {invalid_value, Val}}) ->
