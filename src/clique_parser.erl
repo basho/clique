@@ -380,8 +380,13 @@ parse_valid_arg_value_with_equal_sign_test() ->
 %% All arguments must be of type k=v
 parse_invalid_kv_arg_test() ->
     Spec = spec(),
-    Args = ["ayo"],
-    ?assertMatch({error, _}, parse({Spec, Args})).
+    %% Argument with equal sign and no value
+    ArgsNoVal = ["ayo="],
+    ?assertMatch({error, {invalid_kv_arg, _}}, parse({Spec, ArgsNoVal})),
+    %% Argument without equal sign and no value
+    ArgsNoEqualAndNoVal = ["ayo"],
+    ?assertMatch({error, {invalid_kv_arg, _}}, parse({Spec, ArgsNoEqualAndNoVal})).
+
 
 %% This succeeds, because we aren't validating the flag, just parsing
 %% Note: Short flags get parsed into tuples with their character as first elem
