@@ -1,3 +1,5 @@
+[![Erlang CI Actions Status](https://github.com/basho/clique/workflows/Erlang%20CI/badge.svg)](https://github.com/basho/clique/actions)
+
 # Introduction
 Clique is an opinionated framework for building command line interfaces in
 Erlang. It provides users with an interface that gives them enough power to
